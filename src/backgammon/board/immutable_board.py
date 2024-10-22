@@ -7,6 +7,7 @@ logging.basicConfig(
     level=logging.WARNING,  # Change to DEBUG for more detailed logs
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
+
 logger = logging.getLogger(__name__)
 
 
