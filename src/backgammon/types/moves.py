@@ -1,7 +1,6 @@
 from enum import Enum, auto
 from dataclasses import dataclass
 from typing import Tuple
-from .player import Player
 from enum import IntEnum
 
 
@@ -32,6 +31,15 @@ class Position(IntEnum):
     P_23 = 23
     BAR = 24
     BEAR_OFF = 25
+
+
+class Player(IntEnum):
+    """
+    An enumeration to represent the players with a simple integer value for each player.
+    """
+
+    PLAYER1 = 0
+    PLAYER2 = 1
 
 
 @dataclass(frozen=True)

@@ -1,10 +1,10 @@
-from .player import Player
 from .moves import (
     Position,
     SubMove,
     BoardState,
     FullMove,
     NUMBER_OF_POINTS,
+    Player,
 )
 
 __all__ = [
