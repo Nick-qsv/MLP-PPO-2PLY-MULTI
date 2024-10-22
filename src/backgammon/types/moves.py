@@ -52,3 +52,6 @@ class BoardState(Enum):
     ON_BAR = auto()
     BEAR_OFF = auto()
     GAME_OVER = auto()
+
+
+NUMBER_OF_POINTS = 24
