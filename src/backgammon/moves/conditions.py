@@ -1,5 +1,25 @@
-from src.backgammon.types import Player, NUMBER_OF_POINTS, Position
+from src.backgammon.types import Player, NUMBER_OF_POINTS, Position, BoardState
 from src.backgammon.board import ImmutableBoard
+
+
+def compute_board_state(board: ImmutableBoard, player: Player) -> "BoardState":
+    """
+    Determines the current state of the board for the specified player.
+
+    Args:
+        board (ImmutableBoard): The current state of the board.
+        player (Player): The player for whom to compute the board state.
+
+    Returns:
+        BoardState: The current state of the board (NORMAL, ON_BAR, BEAR_OFF, GAME_OVER).
+    """
+    if check_for_win(board, player):
+        return BoardState.GAME_OVER  # Player has won the game
+    if check_for_bar(board, player):
+        return BoardState.ON_BAR  # Player has checkers on the bar
+    if all_checkers_home(board, player):
+        return BoardState.BEAR_OFF  # Player can start bearing off
+    return BoardState.NORMAL  # Player is in a normal state
 
 
 def valid_move(destination_idx: int, player: Player, board: ImmutableBoard) -> bool:
