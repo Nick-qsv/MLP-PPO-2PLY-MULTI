@@ -1,6 +1,6 @@
 from enum import Enum, auto
 from dataclasses import dataclass
-from typing import List
+from typing import Tuple
 from .player import Player
 from enum import IntEnum
 
@@ -43,7 +43,7 @@ class SubMove:
 
 @dataclass
 class FullMove:
-    sub_move_commands: List[SubMove]
+    sub_move_commands: Tuple[SubMove, ...]
     player: Player
 
 
