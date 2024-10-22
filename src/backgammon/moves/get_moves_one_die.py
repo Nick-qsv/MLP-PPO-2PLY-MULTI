@@ -12,7 +12,7 @@ from src.backgammon.types import Player, Position, SubMove, NUMBER_OF_POINTS, Bo
 
 def get_moves_with_one_die(
     board: ImmutableBoard, die_value: int, player: Player
-) -> list:
+) -> Tuple[SubMove, ...]:
     """
     Generates all possible sub-moves for a player given a single die value based on the current board state.
 
@@ -22,7 +22,7 @@ def get_moves_with_one_die(
         player (Player): The player for whom to generate moves.
 
     Returns:
-        list: A list of possible SubMove instances.
+        Tuple[SubMove, ...]: A tuple of possible SubMove instances.
     """
     # Determine the current state of the board for the player
     current_board_state = compute_board_state(board, player)
@@ -34,7 +34,7 @@ def get_moves_with_one_die(
     elif current_board_state == BoardState.BEAR_OFF:
         return get_moves_bear_off(board, die_value, player)
     else:
-        return []  # No moves available (e.g., GAME_OVER)
+        return ()  # No moves available (e.g., GAME_OVER)
 
 
 def get_moves_normal(
@@ -52,7 +52,6 @@ def get_moves_normal(
         Tuple[SubMove, ...]: A tuple of valid SubMove instances.
     """
     moves = []
-    # player_idx = player.value  # 0 for PLAYER1, 1 for PLAYER2
     direction = 1 if player == Player.PLAYER1 else -1
 
     # Select the appropriate positions tuple based on the player
@@ -150,7 +149,6 @@ def get_moves_bear_off(
         Tuple[SubMove, ...]: A tuple of valid SubMove instances for bearing off.
     """
     move_set = []
-    # player_idx = player.value  # 0 for PLAYER1, 1 for PLAYER2
 
     # Define home board indices and movement direction based on player
     if player == Player.PLAYER1:

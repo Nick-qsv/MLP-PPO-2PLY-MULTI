@@ -44,6 +44,20 @@ class ImmutableBoard:
             borne_off=(0, 0),
         )
 
+    def __hash__(self):
+        """
+        Efficient hash function for ImmutableBoard by combining all board attributes.
+        """
+        # Flatten all positions and combine them into a single tuple for hashing
+        return hash(
+            (
+                self.positions_0,
+                self.positions_1,
+                self.bar,
+                self.borne_off,
+            )
+        )
+
     def move_checker(self, player: Player, sub_move: SubMove) -> "ImmutableBoard":
         positions_0, positions_1 = list(self.positions_0), list(self.positions_1)
         bar, borne_off = list(self.bar), list(self.borne_off)
