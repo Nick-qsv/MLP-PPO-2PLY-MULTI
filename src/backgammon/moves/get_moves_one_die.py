@@ -52,7 +52,7 @@ def get_moves_normal(
         Tuple[SubMove, ...]: A tuple of valid SubMove instances.
     """
     moves = []
-    player_idx = player.value  # 0 for PLAYER1, 1 for PLAYER2
+    # player_idx = player.value  # 0 for PLAYER1, 1 for PLAYER2
     direction = 1 if player == Player.PLAYER1 else -1
 
     # Select the appropriate positions tuple based on the player
@@ -150,7 +150,7 @@ def get_moves_bear_off(
         Tuple[SubMove, ...]: A tuple of valid SubMove instances for bearing off.
     """
     move_set = []
-    player_idx = player.value  # 0 for PLAYER1, 1 for PLAYER2
+    # player_idx = player.value  # 0 for PLAYER1, 1 for PLAYER2
 
     # Define home board indices and movement direction based on player
     if player == Player.PLAYER1:
