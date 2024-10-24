@@ -9,3 +9,7 @@
 # all during this update, workers keep on running games and uploading experiences to the queue
 # if the number of episodes used in updates % 100,000, upload the current model to S3
 # when episode 1 million is reached, stop the training
+
+# every worker has its own instance of the ppo agent class with the policy and value network
+# this agent class has the parameters stored in some other class that gets atomic swap updated by the Trainer
+# thread safe because the params have a lock only for writes not readss from workers to the parameters
