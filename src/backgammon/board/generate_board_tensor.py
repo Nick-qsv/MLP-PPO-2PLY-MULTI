@@ -9,7 +9,6 @@ def generate_all_board_features(
     board: ImmutableBoard,
     current_player: Player,
     legal_moves: List[FullMove],
-    roll_result: List[int],
 ) -> torch.Tensor:
     """
     Generates a tensor of all possible board features based on legal moves.
