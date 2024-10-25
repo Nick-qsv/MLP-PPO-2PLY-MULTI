@@ -1,3 +1,41 @@
-from .configuration import *
+from .configuration import (
+    NUM_ENVS,
+    NUM_UPDATES,
+    T_HORIZON,
+    NUM_EPOCHS,
+    HIDDEN_SIZE,
+    LEARNING_RATE,
+    GAMMA,
+    EPS_CLIP,
+    VALUE_LOSS_COEF,
+    ENTROPY_COEF_START,
+    ENTROPY_COEF_END,
+    ENTROPY_ANNEAL_EPISODES,
+    MAX_TIMESTEPS,
+    NUM_EPISODES,
+    MODEL_SAVE_FREQUENCY,
+    S3_BUCKET_NAME,
+    S3_MODEL_PREFIX,
+    S3_LOG_PREFIX,
+)
 
-__all__ = ["configuration"]
+__all__ = [
+    "NUM_ENVS",
+    "NUM_UPDATES",
+    "T_HORIZON",
+    "NUM_EPOCHS",
+    "HIDDEN_SIZE",
+    "LEARNING_RATE",
+    "GAMMA",
+    "EPS_CLIP",
+    "VALUE_LOSS_COEF",
+    "ENTROPY_COEF_START",
+    "ENTROPY_COEF_END",
+    "ENTROPY_ANNEAL_EPISODES",
+    "MAX_TIMESTEPS",
+    "NUM_EPISODES",
+    "MODEL_SAVE_FREQUENCY",
+    "S3_BUCKET_NAME",
+    "S3_MODEL_PREFIX",
+    "S3_LOG_PREFIX",
+]

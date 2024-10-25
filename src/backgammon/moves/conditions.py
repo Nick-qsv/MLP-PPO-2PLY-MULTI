@@ -192,3 +192,7 @@ def all_checkers_home(board: ImmutableBoard, player: Player) -> bool:
 
     # Total checkers should be 15 (home + borne off)
     return total_checkers + borne_off_checkers == 15
+
+
+def get_opponent(player: Player) -> Player:
+    return Player.PLAYER2 if player == Player.PLAYER1 else Player.PLAYER1

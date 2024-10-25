@@ -1,3 +1,10 @@
+import multiprocessing
+from multiprocessing import ParameterManager, Worker, ExperienceQueue
+from agents import Trainer, BackgammonPolicyNetwork
+from utils import RingReplayBuffer
+from config import *
+
+
 def main():
     # Initialize multiprocessing manager
     parameter_manager = ParameterManager()
@@ -20,9 +27,9 @@ def main():
 
     # Monitor training and handle model saving
     episode_count = 0
-    while episode_count < 1_000_000:
+    while episode_count < NUM_EPISODES:
         # Check if it's time to save the model
-        if episode_count % 100_000 == 0:
+        if episode_count % MODEL_SAVE_FREQUENCY == 0:
             # Save model to S3
             pass
         # Update episode_count based on episodes processed
