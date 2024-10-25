@@ -1,4 +1,5 @@
 import logging
+import numpy as np
 from dataclasses import dataclass
 from typing import Tuple
 from src.backgammon.types import Position, Player, SubMove
@@ -58,6 +59,53 @@ class ImmutableBoard:
                 self.borne_off,
             )
         )
+
+    def get_board_features(self, current_player: Player) -> np.ndarray:
+        """
+        Computes the 198-dimensional feature vector for the board state.
+        """
+        features = np.zeros(198, dtype=np.float32)
+        feature_index = 0
+
+        # Process both players' positions
+        for player_idx, positions in enumerate([self.positions_0, self.positions_1]):
+            # Convert positions to NumPy array for vectorized operations
+            positions_array = np.frombuffer(positions, dtype=np.int8)
+
+            # Initialize a (24, 4) feature slice for points
+            features_slice = np.zeros((24, 4), dtype=np.float32)
+
+            # Vectorized computation for point features
+            checkers = positions_array
+            features_slice[:, 0] = (checkers >= 1).astype(np.float32)
+            features_slice[:, 1] = (checkers >= 2).astype(np.float32)
+            features_slice[:, 2] = (checkers >= 3).astype(np.float32)
+            features_slice[:, 3] = np.maximum(checkers - 3, 0) / 2.0
+
+            # Flatten and assign to the main feature vector
+            features[feature_index : feature_index + 96] = features_slice.flatten()
+            feature_index += 96
+
+            # Bar checkers feature
+            bar_checkers = self.bar[player_idx]
+            features[feature_index] = bar_checkers / 2.0
+            feature_index += 1
+
+            # Borne off checkers feature
+            borne_off_checkers = self.borne_off[player_idx]
+            features[feature_index] = borne_off_checkers / 15.0
+            feature_index += 1
+
+        # Current player indicator features
+        features[feature_index] = 1.0 if current_player == Player.PLAYER1 else 0.0
+        features[feature_index + 1] = 1.0 if current_player == Player.PLAYER2 else 0.0
+        feature_index += 2
+
+        assert (
+            feature_index == 198
+        ), f"Feature vector length is {feature_index}, expected 198"
+
+        return features
 
     def move_checker(self, player: Player, sub_move: SubMove) -> "ImmutableBoard":
         positions_0, positions_1 = list(self.positions_0), list(self.positions_1)
