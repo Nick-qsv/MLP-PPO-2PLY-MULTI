@@ -1,5 +1,6 @@
 import logging
 import numpy as np
+import torch
 from dataclasses import dataclass
 from typing import Tuple
 from src.backgammon.types import Position, Player, SubMove
@@ -15,14 +16,15 @@ logger = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class ImmutableBoard:
     # For each point on the board, store the number of checkers for each player
-    positions_0: Tuple[int, ...]  # Length 24
-    positions_1: Tuple[int, ...]  # Length 24
+    positions_0: Tuple[int, ...]  # Length 24 (Player 1's checkers)
+    positions_1: Tuple[int, ...]  # Length 24 (Player 2's checkers)
     # Store the number of checkers on the bar and borne off for each player
     bar: Tuple[int, int]  # (Player1_bar, Player2_bar)
     borne_off: Tuple[int, int]  # (Player1_borne_off, Player2_borne_off)
+    device: torch.device = torch.device("cpu")  # Device to place tensors on
 
     @staticmethod
-    def initial_board() -> "ImmutableBoard":
+    def initial_board(device: torch.device = torch.device("cpu")) -> "ImmutableBoard":
         # Initialize positions with zeros
         positions_0 = [0] * 24
         positions_1 = [0] * 24
@@ -44,6 +46,7 @@ class ImmutableBoard:
             positions_1=tuple(positions_1),
             bar=(0, 0),
             borne_off=(0, 0),
+            device=device,
         )
 
     def __hash__(self):
@@ -60,30 +63,36 @@ class ImmutableBoard:
             )
         )
 
-    def get_board_features(self, current_player: Player) -> np.ndarray:
+    def get_board_features(self, current_player: Player) -> torch.Tensor:
         """
         Computes the 198-dimensional feature vector for the board state.
+        Returns:
+            torch.Tensor: A tensor of shape (198,) representing the board features.
         """
-        features = np.zeros(198, dtype=np.float32)
+        features = torch.zeros(198, dtype=torch.float32, device=self.device)
         feature_index = 0
 
         # Process both players' positions
         for player_idx, positions in enumerate([self.positions_0, self.positions_1]):
-            # Convert positions to NumPy array for vectorized operations
-            positions_array = np.frombuffer(positions, dtype=np.int8)
+            # Convert positions to torch tensor for vectorized operations
+            positions_tensor = torch.tensor(
+                positions, dtype=torch.int8, device=self.device
+            )
 
             # Initialize a (24, 4) feature slice for points
-            features_slice = np.zeros((24, 4), dtype=np.float32)
+            features_slice = torch.zeros(
+                (24, 4), dtype=torch.float32, device=self.device
+            )
 
             # Vectorized computation for point features
-            checkers = positions_array
-            features_slice[:, 0] = (checkers >= 1).astype(np.float32)
-            features_slice[:, 1] = (checkers >= 2).astype(np.float32)
-            features_slice[:, 2] = (checkers >= 3).astype(np.float32)
-            features_slice[:, 3] = np.maximum(checkers - 3, 0) / 2.0
+            checkers = positions_tensor
+            features_slice[:, 0] = (checkers >= 1).float()
+            features_slice[:, 1] = (checkers >= 2).float()
+            features_slice[:, 2] = (checkers >= 3).float()
+            features_slice[:, 3] = torch.clamp(checkers - 3, min=0).float() / 2.0
 
             # Flatten and assign to the main feature vector
-            features[feature_index : feature_index + 96] = features_slice.flatten()
+            features[feature_index : feature_index + 96] = features_slice.view(-1)
             feature_index += 96
 
             # Bar checkers feature
@@ -108,6 +117,7 @@ class ImmutableBoard:
         return features
 
     def move_checker(self, player: Player, sub_move: SubMove) -> "ImmutableBoard":
+        # Implementation remains the same as before
         positions_0, positions_1 = list(self.positions_0), list(self.positions_1)
         bar, borne_off = list(self.bar), list(self.borne_off)
 
@@ -179,6 +189,7 @@ class ImmutableBoard:
             positions_1=tuple(positions_1),
             bar=tuple(bar),
             borne_off=tuple(borne_off),
+            device=self.device,
         )
 
 
