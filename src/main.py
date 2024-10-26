@@ -6,40 +6,67 @@ from config import *
 
 
 def main():
-    # Initialize multiprocessing manager
+    # Initialize parameter manager, ring replay buffer, and experience queue
     parameter_manager = ParameterManager()
-
-    # Initialize ring replay buffer
     replay_buffer = RingReplayBuffer(max_size=10000)
+    experience_queue = ExperienceQueue()
+    trainer_queue = multiprocessing.Queue()
 
     # Create and start worker processes
     workers = [
-        Worker(worker_id=i, parameter_manager=parameter_manager) for i in range(7)
+        Worker(
+            worker_id=i,
+            parameter_manager=parameter_manager,
+            experience_queue=experience_queue,
+        )
+        for i in range(7)
     ]
+    worker_processes = []
     for worker in workers:
         worker_process = multiprocessing.Process(target=worker.run)
         worker_process.start()
+        worker_processes.append(worker_process)
 
     # Create and start trainer process
-    trainer = Trainer(parameter_manager=parameter_manager, replay_buffer=replay_buffer)
+    trainer = Trainer(parameter_manager=parameter_manager, trainer_queue=trainer_queue)
     trainer_process = multiprocessing.Process(target=trainer.train)
     trainer_process.start()
 
     # Monitor training and handle model saving
     episode_count = 0
+
     while episode_count < NUM_EPISODES:
-        # Check if it's time to save the model
-        if episode_count % MODEL_SAVE_FREQUENCY == 0:
-            # Save model to S3
+        # Try to get episodes from the ExperienceQueue
+        try:
+            episode = experience_queue.get(timeout=1)
+            replay_buffer.add_episode(episode)
+            episode_count += 1
+
+            # Check if replay_buffer has reached 1,000 episodes
+            if len(replay_buffer.buffer) >= 1000:
+                # Drain the buffer and push episodes to the Trainer
+                episodes_to_train = list(replay_buffer.buffer)
+                replay_buffer.buffer.clear()
+                # Send episodes to Trainer via trainer_queue
+                trainer_queue.put(episodes_to_train)
+        except queue.Empty:
+            # No new episodes in the ExperienceQueue
             pass
-        # Update episode_count based on episodes processed
-        pass
+
+        # Check if it's time to save the model
+        if episode_count % MODEL_SAVE_FREQUENCY == 0 and episode_count != 0:
+            # Save model to S3 or local storage
+            print(f"Saving model at episode {episode_count}")
+            # parameter_manager.save_model()
 
     # Terminate processes after training
-    for worker in workers:
+    for worker_process in worker_processes:
         worker_process.terminate()
     trainer_process.terminate()
 
+
+if __name__ == "__main__":
+    main()
 
 # 7 workers running individual games
 # uploading experiences grouped into episodes to experience queue
