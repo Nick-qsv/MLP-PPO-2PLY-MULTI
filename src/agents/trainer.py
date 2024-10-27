@@ -3,17 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Categorical
 import multiprocessing
-
-# Hyperparameters
-# GAMMA = 0.99
-# LAMBDA = 0.95
-# LEARNING_RATE = 3e-4
-# ENTROPY_COEF_START = 0.01
-# ENTROPY_COEF_END = 0.001
-# ENTROPY_ANNEAL_EPISODES = 100000  # Number of episodes over which to anneal entropy coefficient
-# EPSILON = 0.2  # PPO clipping parameter
-# K_EPOCHS = 4  # Number of epochs to update policy
-# BATCH_SIZE = 64  # Batch size for mini-batch updates
+from agents import BackgammonPolicyNetwork
+from config import *
 
 
 class Trainer:
