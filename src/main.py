@@ -3,6 +3,8 @@ from multiprocessing import ParameterManager, Worker, ExperienceQueue
 from agents import Trainer, BackgammonPolicyNetwork
 from utils import RingReplayBuffer
 from config import *
+import torch
+import queue  # Make sure to import queue
 
 
 def main():
@@ -27,10 +29,16 @@ def main():
         worker_process.start()
         worker_processes.append(worker_process)
 
-    # Create and start trainer process
+    # Initialize Trainer (no separate process)
     trainer = Trainer(parameter_manager=parameter_manager, trainer_queue=trainer_queue)
-    trainer_process = multiprocessing.Process(target=trainer.train)
-    trainer_process.start()
+
+    # Device setup for GPU
+    trainer.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    trainer.policy_network.to(trainer.device)
+
+    # Initialize trainer's state
+    state_dict = parameter_manager.get_parameters()
+    trainer.policy_network.load_state_dict(state_dict)
 
     # Monitor training and handle model saving
     episode_count = 0
@@ -47,8 +55,12 @@ def main():
                 # Drain the buffer and push episodes to the Trainer
                 episodes_to_train = list(replay_buffer.buffer)
                 replay_buffer.buffer.clear()
-                # Send episodes to Trainer via trainer_queue
-                trainer_queue.put(episodes_to_train)
+                # Perform training directly
+                trainer.update(episodes_to_train)
+                trainer.update_entropy_coef()
+                # After update, update parameters in parameter manager
+                parameter_manager.update_parameters(trainer.policy_network.state_dict())
+                parameter_manager.increment_version()
         except queue.Empty:
             # No new episodes in the ExperienceQueue
             pass
@@ -59,14 +71,14 @@ def main():
             print(f"Saving model at episode {episode_count}")
             # parameter_manager.save_model()
 
-    # Terminate processes after training
+    # Terminate worker processes after training
     for worker_process in worker_processes:
         worker_process.terminate()
-    trainer_process.terminate()
 
 
 if __name__ == "__main__":
     main()
+
 
 # 7 workers running individual games
 # uploading experiences grouped into episodes to experience queue

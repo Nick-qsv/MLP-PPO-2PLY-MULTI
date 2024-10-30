@@ -191,7 +191,11 @@ class Trainer:
                 critic_loss = F.mse_loss(state_values_pred, batch_state_values)
 
                 # Total loss
-                loss = actor_loss + 0.5 * critic_loss - self.entropy_coef * entropy
+                loss = (
+                    actor_loss
+                    + VALUE_LOSS_COEF * critic_loss
+                    - self.entropy_coef * entropy
+                )
 
                 # Backpropagation
                 self.optimizer.zero_grad()
