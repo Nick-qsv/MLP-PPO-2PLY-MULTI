@@ -2,15 +2,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Categorical
-import multiprocessing
 from agents import BackgammonPolicyNetwork
 from config import *
 
 
 class Trainer:
-    def __init__(self, parameter_manager, trainer_queue, device=None):
+    def __init__(self, parameter_manager, device=None):
         self.parameter_manager = parameter_manager
-        self.trainer_queue = trainer_queue
         self.device = device if device is not None else torch.device("cpu")
 
         # Initialize policy network
@@ -36,21 +34,10 @@ class Trainer:
         self.K_epochs = K_EPOCHS
         self.batch_size = BATCH_SIZE
 
-    def train(self):
-        while True:
-            # Wait for episodes to arrive
-            episodes = self.trainer_queue.get()
-            # Update the total episodes
-            self.total_episodes += len(episodes)
-            # Process episodes
-            self.update(episodes)
-            # Update entropy coefficient
-            self.update_entropy_coef()
-            # After update, update parameters in parameter manager
-            self.parameter_manager.update_parameters(self.policy_network.state_dict())
-            self.parameter_manager.increment_version()
-
     def update(self, episodes):
+        # Update the total episodes
+        self.total_episodes += len(episodes)
+
         # Collect experiences from episodes
         observations = []
         actions = []
@@ -201,6 +188,12 @@ class Trainer:
                 self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
+
+        # After update, update entropy coefficient
+        self.update_entropy_coef()
+        # After update, update parameters in parameter manager
+        self.parameter_manager.update_parameters(self.policy_network.state_dict())
+        self.parameter_manager.increment_version()
 
     def update_entropy_coef(self):
         progress = min(1.0, self.total_episodes / self.entropy_anneal_episodes)
