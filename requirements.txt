@@ -77,3 +77,4 @@ tzdata==2024.1
 urllib3==2.2.2
 Werkzeug==3.0.3
 wrapt==1.16.0
+pynvml==11.5.3

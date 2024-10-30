@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import pynvml
+import time
 from torch.distributions import Categorical
 from agents import BackgammonPolicyNetwork
 from config import *
@@ -33,8 +35,19 @@ class Trainer:
         self.epsilon = EPSILON
         self.K_epochs = K_EPOCHS
         self.batch_size = BATCH_SIZE
+        # Initialize NVML handle for the GPU
+        self.gpu_handle = pynvml.nvmlDeviceGetHandleByIndex(0)  # Assuming single GPU
 
     def update(self, episodes):
+        # Profile GPU before update
+        gpu_util_before = pynvml.nvmlDeviceGetUtilizationRates(self.gpu_handle)
+        mem_info_before = pynvml.nvmlDeviceGetMemoryInfo(self.gpu_handle)
+
+        start_time = time.time()
+
+        # Initialize maximum GPU utilization tracker
+        max_gpu_util = gpu_util_before.gpu
+        max_mem_used = mem_info_before.used
         # Update the total episodes
         self.total_episodes += len(episodes)
 
@@ -189,11 +202,36 @@ class Trainer:
                 loss.backward()
                 self.optimizer.step()
 
+                # Update maximum GPU utilization
+                torch.cuda.synchronize()
+                current_gpu_util = pynvml.nvmlDeviceGetUtilizationRates(self.gpu_handle)
+                current_mem_info = pynvml.nvmlDeviceGetMemoryInfo(self.gpu_handle)
+                max_gpu_util = max(max_gpu_util, current_gpu_util.gpu)
+                max_mem_used = max(max_mem_used, current_mem_info.used)
+
         # After update, update entropy coefficient
         self.update_entropy_coef()
         # After update, update parameters in parameter manager
         self.parameter_manager.update_parameters(self.policy_network.state_dict())
         self.parameter_manager.increment_version()
+
+        end_time = time.time()
+
+        # Profile GPU after update
+        gpu_util_after = pynvml.nvmlDeviceGetUtilizationRates(self.gpu_handle)
+        mem_info_after = pynvml.nvmlDeviceGetMemoryInfo(self.gpu_handle)
+
+        # Print summary
+        print(f"Update completed in {end_time - start_time:.2f} seconds")
+        print("GPU Usage Summary:")
+        print(
+            f"  Before Update - Utilization: {gpu_util_before.gpu}%, Memory Used: {mem_info_before.used / (1024 ** 2):.2f} MB"
+        )
+        print(
+            f"  After Update  - Utilization: {gpu_util_after.gpu}%, Memory Used: {mem_info_after.used / (1024 ** 2):.2f} MB"
+        )
+        print(f"  Max Utilization during Update: {max_gpu_util}%")
+        print(f"  Max Memory Used during Update: {max_mem_used / (1024 ** 2):.2f} MB")
 
     def update_entropy_coef(self):
         progress = min(1.0, self.total_episodes / self.entropy_anneal_episodes)

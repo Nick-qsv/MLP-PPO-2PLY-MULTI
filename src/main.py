@@ -4,16 +4,66 @@ from agents import Trainer, BackgammonPolicyNetwork
 from utils import RingReplayBuffer
 from config import *
 import torch
-import queue  # Make sure to import queue
+import queue
+import pynvml
 
 
 def main():
+    """
+    Main function to initialize and execute the distributed training pipeline.
+
+    This function performs the following operations:
+
+    1. **Initialization**:
+        - Sets up the `ParameterManager` to manage shared model parameters and versioning.
+        - Initializes a `RingReplayBuffer` with a maximum size of 10,000 to store episodes from workers.
+        - Creates an `ExperienceQueue` to collect experiences from worker processes.
+        - Initializes a `Trainer` instance responsible for updating the policy and value networks.
+
+    2. **Worker Processes**:
+        - Spawns 7 worker processes, each running an instance of the PPO agent.
+        - Each worker interacts with the environment to generate game episodes.
+        - Workers upload experiences grouped into episodes to the `ExperienceQueue`.
+        - Workers periodically poll the `ParameterManager` for updated parameters based on the version number and update their local copies if a new version is available.
+
+    3. **Training Loop**:
+        - Continuously monitors the `ExperienceQueue` to retrieve and store episodes in the `RingReplayBuffer`.
+        - Once the `RingReplayBuffer` accumulates 1,000 episodes, it serializes the data and triggers the `Trainer` to perform a network update on the GPU.
+        - After training, the `Trainer` updates the shared `ParameterManager` with the new `state_dict` and increments the version number to notify workers of the update.
+        - Every 100,000 episodes, the current model is saved to S3 for backup and checkpointing purposes.
+        - The training loop continues until a total of 1 million episodes have been processed.
+
+    4. **Concurrency and Synchronization**:
+        - Utilizes a `multiprocessing.Manager` to maintain a thread-safe `state_dict` of model parameters and a shared version number.
+        - The `Trainer` acquires a lock on the `ParameterManager` only during parameter updates to ensure thread safety.
+        - Workers read from the `ParameterManager` without locking, as they only update their local copies of the parameters.
+
+    5. **Termination**:
+        - After reaching the target number of episodes, the function gracefully terminates all worker processes.
+
+    **Components**:
+        - `ParameterManager`: Manages shared model parameters and versioning across processes.
+        - `RingReplayBuffer`: Stores a fixed number of episodes for training.
+        - `ExperienceQueue`: Queue for collecting experiences from workers.
+        - `Trainer`: Handles the training of policy and value networks using collected experiences.
+        - `Worker`: Represents individual worker processes running PPO agents.
+
+    **Device Configuration**:
+        - The `Trainer` is configured to use a GPU if available (`cuda`), otherwise defaults to CPU.
+        - The policy network is moved to the configured device for efficient computation.
+
+    **Model Saving**:
+        - Models are periodically saved to S3 to ensure progress is not lost and to allow for checkpointing.
+
+    **Termination Condition**:
+        - The training process stops once 1 million episodes have been processed.
+
+    """
+    pynvml.nvmlInit()
     # Initialize parameter manager, ring replay buffer, and experience queue
     parameter_manager = ParameterManager()
     replay_buffer = RingReplayBuffer(max_size=10000)
     experience_queue = ExperienceQueue()
-    trainer_queue = multiprocessing.Queue()
-
     # Create and start worker processes
     workers = [
         Worker(
@@ -30,10 +80,11 @@ def main():
         worker_processes.append(worker_process)
 
     # Initialize Trainer (no separate process)
-    trainer = Trainer(parameter_manager=parameter_manager, trainer_queue=trainer_queue)
+    trainer = Trainer(parameter_manager=parameter_manager)
 
     # Device setup for GPU
     trainer.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {trainer.device}")
     trainer.policy_network.to(trainer.device)
 
     # Initialize trainer's state
@@ -57,10 +108,7 @@ def main():
                 replay_buffer.buffer.clear()
                 # Perform training directly
                 trainer.update(episodes_to_train)
-                trainer.update_entropy_coef()
-                # After update, update parameters in parameter manager
-                parameter_manager.update_parameters(trainer.policy_network.state_dict())
-                parameter_manager.increment_version()
+
         except queue.Empty:
             # No new episodes in the ExperienceQueue
             pass
@@ -74,6 +122,8 @@ def main():
     # Terminate worker processes after training
     for worker_process in worker_processes:
         worker_process.terminate()
+
+    pynvml.nvmlShutdown()
 
 
 if __name__ == "__main__":
