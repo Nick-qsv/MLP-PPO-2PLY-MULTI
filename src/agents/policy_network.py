@@ -1,5 +1,6 @@
 import torch.nn as nn
 import torch.nn.functional as F
+import torch
 
 
 class BackgammonPolicyNetwork(nn.Module):
@@ -54,6 +55,11 @@ class BackgammonPolicyNetwork(nn.Module):
         self.action_head = nn.Linear(hidden_size, action_size)
         self.value_head = nn.Linear(hidden_size, 1)
 
+        # Initialize weights using Xavier initialization suitable for sigmoid
+        nn.init.xavier_uniform_(self.fc1.weight)
+        nn.init.xavier_uniform_(self.action_head.weight)
+        nn.init.xavier_uniform_(self.value_head.weight)
+
     def forward(self, x):
         """
         Defines the forward pass of the network.
@@ -68,7 +74,7 @@ class BackgammonPolicyNetwork(nn.Module):
             state_values (torch.Tensor): Tensor containing state value estimates.
                                    Shape: (batch_size,)
         """
-        x = F.relu(self.fc1(x))  # Hidden layer with ReLU activation
+        x = torch.sigmoid(self.fc1(x))  # Hidden layer with Sigmoid activation
         logits = self.action_head(x)  # Action logits
         state_values = self.value_head(x).squeeze(-1)  # State value estimates
         return logits, state_values

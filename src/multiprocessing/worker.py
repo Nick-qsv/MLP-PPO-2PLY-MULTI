@@ -3,7 +3,7 @@ import torch.nn.functional as F
 from torch.distributions import Categorical
 import multiprocessing
 import threading
-from environments import Episode, Experience
+from environments import Episode, Experience, BackgammonEnv
 from agents import BackgammonPolicyNetwork
 
 
