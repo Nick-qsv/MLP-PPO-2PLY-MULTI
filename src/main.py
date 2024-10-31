@@ -3,6 +3,7 @@ from multiprocessing import ParameterManager, Worker, ExperienceQueue
 from agents import Trainer, BackgammonPolicyNetwork
 from utils import RingReplayBuffer
 from config import *
+import time
 import torch
 import queue
 import pynvml
@@ -94,6 +95,9 @@ def main():
     # Monitor training and handle model saving
     episode_count = 0
 
+    # Initialize episode time tracker
+    last_print_time = time.time()
+
     while episode_count < NUM_EPISODES:
         # Try to get episodes from the ExperienceQueue
         try:
@@ -118,6 +122,13 @@ def main():
             # Save model to S3 or local storage
             print(f"Saving model at episode {episode_count}")
             # parameter_manager.save_model()
+
+        if episode_count % 100 == 0:
+            current_time = time.time()
+            elapsed = current_time - last_print_time
+            eps_per_sec = 100 / elapsed if elapsed > 0 else float("inf")
+            print(f"Episode {episode_count} completed | {eps_per_sec:.2f} eps/sec")
+            last_print_time = current_time
 
     # Terminate worker processes after training
     for worker_process in worker_processes:

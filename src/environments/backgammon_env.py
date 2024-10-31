@@ -5,29 +5,20 @@ import numpy as np
 from typing import Dict
 from backgammon.board.immutable_board import ImmutableBoard
 from backgammon.moves.conditions import Player, get_opponent
-from backgammon.types import FullMove
 from backgammon.moves.generate_all_moves import get_all_possible_moves
 from backgammon.board.generate_board_tensor import generate_all_board_features
-
+from env_helper import (
+    execute_full_move_on_board_copy,
+    check_game_over,
+    check_for_gammon,
+    check_for_backgammon,
+)
 
 REWARD_PASS = 0.0
 REWARD_INVALID_ACTION = -1.0
-REWARD_WIN_BACKGAMMON = 3.0
-REWARD_WIN_GAMMON = 2.0
+REWARD_WIN_BACKGAMMON = 2.0
+REWARD_WIN_GAMMON = 1.5
 REWARD_WIN_NORMAL = 1.0
-
-
-def get_opponent(player: Player) -> Player:
-    return Player.PLAYER2 if player == Player.PLAYER1 else Player.PLAYER1
-
-
-def execute_full_move_on_board_copy(
-    board: ImmutableBoard, full_move: FullMove
-) -> ImmutableBoard:
-    """
-    Placeholder for executing a full move on a copy of the board.
-    """
-    return board
 
 
 class BackgammonEnv(gym.Env):
@@ -151,12 +142,12 @@ class BackgammonEnv(gym.Env):
         self.board = execute_full_move_on_board_copy(self.board, selected_move)
 
         # Check for game over
-        if self.check_game_over():
+        if check_game_over(self.board, self.current_player):
             # Winning conditions
-            is_backgammon = self.check_for_backgammon(self.current_player)
+            is_backgammon = check_for_backgammon(self.board, self.current_player)
             is_gammon = False
             if not is_backgammon:
-                is_gammon = self.check_for_gammon(self.current_player)
+                is_gammon = check_for_gammon(self.board, self.current_player)
 
             if is_backgammon:
                 game_score = 3
@@ -167,6 +158,7 @@ class BackgammonEnv(gym.Env):
             else:
                 game_score = 1
                 reward = torch.tensor(REWARD_WIN_NORMAL, device=self.device)
+
             info.update({"winner": self.current_player, "game_score": game_score})
             self.player_scores[self.current_player] += game_score
             self.game_over = True
@@ -245,25 +237,3 @@ class BackgammonEnv(gym.Env):
 
     def pass_turn(self):
         self.current_player = get_opponent(self.current_player)
-
-    def check_game_over(self):
-        """
-        Placeholder for checking if the current player has won the game.
-        """
-        # Placeholder implementation
-        # Assume game is over if a player has borne off all checkers
-        return self.board.borne_off[self.current_player] >= 15
-
-    def check_for_backgammon(self, player: Player) -> bool:
-        """
-        Placeholder for checking if the player has won by backgammon.
-        """
-        # Placeholder implementation
-        return False
-
-    def check_for_gammon(self, player: Player) -> bool:
-        """
-        Placeholder for checking if the player has won by gammon.
-        """
-        # Placeholder implementation
-        return False
