@@ -28,6 +28,8 @@ class BackgammonPolicyNetwork(nn.Module):
         hidden_size (int): The number of neurons in the hidden fully connected layer.
                            Default is 128.
         action_size (int): The number of possible actions.
+        use_sigmoid (bool): If True, use sigmoid activation; if False, use ReLU. Default is False (ReLU).
+
 
     Attributes:
         fc1 (nn.Linear): The first fully connected layer mapping inputs to hidden representations.
@@ -41,7 +43,9 @@ class BackgammonPolicyNetwork(nn.Module):
         >>> action_probs = F.softmax(logits, dim=-1)  # Convert logits to probabilities
     """
 
-    def __init__(self, input_size=198, hidden_size=128, action_size=500):
+    def __init__(
+        self, input_size=198, hidden_size=128, action_size=500, use_sigmoid=False
+    ):
         """
         Initializes the BackgammonPolicyNetwork.
 
@@ -49,8 +53,12 @@ class BackgammonPolicyNetwork(nn.Module):
             input_size (int, optional): Size of the input feature vector. Default is 198.
             hidden_size (int, optional): Number of neurons in the hidden layer. Default is 128.
             action_size (int): Number of possible actions.
+            use_sigmoid (bool): If True, use sigmoid activation; if False, use ReLU. Default is False (ReLU).
+
         """
         super(BackgammonPolicyNetwork, self).__init__()
+        self.use_sigmoid = use_sigmoid
+        # Define layers
         self.fc1 = nn.Linear(input_size, hidden_size)
         self.action_head = nn.Linear(hidden_size, action_size)
         self.value_head = nn.Linear(hidden_size, 1)
@@ -74,7 +82,11 @@ class BackgammonPolicyNetwork(nn.Module):
             state_values (torch.Tensor): Tensor containing state value estimates.
                                    Shape: (batch_size,)
         """
-        x = torch.sigmoid(self.fc1(x))  # Hidden layer with Sigmoid activation
+        if self.use_sigmoid:
+            x = torch.sigmoid(self.fc1(x))  # Sigmoid activation for hidden layer
+        else:
+            x = torch.relu(self.fc1(x))  # ReLU activation for hidden layer
+
         logits = self.action_head(x)  # Action logits
         state_values = self.value_head(x).squeeze(-1)  # State value estimates
         return logits, state_values

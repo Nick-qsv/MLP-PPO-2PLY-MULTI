@@ -5,6 +5,7 @@ import multiprocessing
 import threading
 from environments import Episode, Experience, BackgammonEnv
 from agents import BackgammonPolicyNetwork
+from config import USE_SIGMOID
 
 
 class Worker:
@@ -32,7 +33,9 @@ class Worker:
         self.device = device if device is not None else torch.device("cpu")
 
         # Initialize local PolicyNetwork
-        self.policy_network = BackgammonPolicyNetwork().to(self.device)
+        self.policy_network = BackgammonPolicyNetwork(use_sigmoid=USE_SIGMOID).to(
+            self.device
+        )
         # Load initial parameters from the ParameterManager
         state_dict = self.parameter_manager.get_parameters()
         self.policy_network.load_state_dict(state_dict)

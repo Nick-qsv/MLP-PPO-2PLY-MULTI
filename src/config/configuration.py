@@ -23,3 +23,5 @@ ENTROPY_ANNEAL_EPISODES = (
 EPSILON = 0.2  # PPO clipping parameter
 K_EPOCHS = 4  # Number of epochs to update policy
 BATCH_SIZE = 64  # Batch size for mini-batch updates
+
+USE_SIGMOID = False  # Use sigmoid for False, reLU for True

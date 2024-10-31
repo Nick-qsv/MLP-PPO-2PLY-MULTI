@@ -17,6 +17,7 @@ from .configuration import (
     EPSILON,
     K_EPOCHS,
     BATCH_SIZE,
+    USE_SIGMOID,
 )
 
 __all__ = [
@@ -38,4 +39,5 @@ __all__ = [
     "EPSILON",
     "K_EPOCHS",
     "BATCH_SIZE",
+    "USE_SIGMOID",
 ]
