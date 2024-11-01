@@ -12,6 +12,9 @@ RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
+# Add /app/src to PYTHONPATH
+ENV PYTHONPATH="/app"
+
 WORKDIR /app
 
 # Install system dependencies

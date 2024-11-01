@@ -8,5 +8,5 @@ class ExperienceQueue:
     def put(self, episode):
         self.queue.put(episode)
 
-    def get(self):
-        return self.queue.get()
+    def get(self, timeout=None):
+        return self.queue.get(timeout=timeout)

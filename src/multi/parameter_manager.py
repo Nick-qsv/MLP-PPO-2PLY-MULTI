@@ -5,6 +5,7 @@ import boto3
 import io
 import os
 from config import S3_BUCKET_NAME, S3_MODEL_PREFIX
+from agents.policy_network import BackgammonPolicyNetwork
 
 
 class ParameterManager:
@@ -24,7 +25,7 @@ class ParameterManager:
         lock (multiprocessing.managers.AcquirerProxy): A lock to ensure thread-safe updates.
     """
 
-    def __init__(self, policy_network_class):
+    def __init__(self, policy_network_class=BackgammonPolicyNetwork):
         self.manager = multiprocessing.Manager()
         self.lock = self.manager.Lock()
 
