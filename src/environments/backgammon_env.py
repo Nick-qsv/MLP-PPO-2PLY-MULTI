@@ -7,7 +7,7 @@ from backgammon.board.immutable_board import ImmutableBoard
 from backgammon.moves.conditions import Player, get_opponent
 from backgammon.moves.generate_all_moves import get_all_possible_moves
 from backgammon.board.generate_board_tensor import generate_all_board_features
-from env_helper import (
+from .env_helper import (
     execute_full_move_on_board_copy,
     check_game_over,
     check_for_gammon,

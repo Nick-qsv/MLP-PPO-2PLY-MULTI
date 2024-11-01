@@ -4,6 +4,7 @@ import numpy as np
 import boto3
 import io
 import os
+from config import S3_BUCKET_NAME, S3_MODEL_PREFIX
 
 
 class ParameterManager:
@@ -41,8 +42,8 @@ class ParameterManager:
 
         # Initialize S3 client attributes (set them according to your configuration)
         self.s3_client = boto3.client("s3")  # or pass as an argument
-        self.s3_bucket_name = "your_s3_bucket_name"
-        self.s3_model_prefix = "your_s3_model_prefix"
+        self.s3_bucket_name = S3_BUCKET_NAME
+        self.s3_model_prefix = S3_MODEL_PREFIX
 
     def get_parameters(self):
         """

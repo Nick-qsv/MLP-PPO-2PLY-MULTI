@@ -1,6 +1,6 @@
 import multiprocessing
-from multiprocessing import ParameterManager, Worker, ExperienceQueue
-from agents import Trainer, BackgammonPolicyNetwork
+from multi import ParameterManager, Worker, ExperienceQueue
+from agents import Trainer
 from utils import RingReplayBuffer
 from config import *
 import time
@@ -129,6 +129,19 @@ def main():
             eps_per_sec = 100 / elapsed if elapsed > 0 else float("inf")
             print(f"Episode {episode_count} completed | {eps_per_sec:.2f} eps/sec")
             last_print_time = current_time
+
+        # Test save to make sure S3 working
+        if episode_count == 100:
+            print(f"Saving model at episode {episode_count}")
+            filename = f"backgammon_ppo_episode_{episode_count}.pth"
+            # Save model via ParameterManager
+            parameter_manager.save_model(filename=filename, to_s3=True)
+
+        # Check if it's time to save the model
+        if episode_count % MODEL_SAVE_FREQUENCY == 0 and episode_count != 0:
+            filename = f"backgammon_ppo_episode_{episode_count}.pth"
+            # Save model via ParameterManager
+            parameter_manager.save_model(filename=filename, to_s3=True)
 
     # Terminate worker processes after training
     for worker_process in worker_processes:

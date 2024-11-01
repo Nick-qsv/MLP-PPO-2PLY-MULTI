@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import pynvml
 import time
 from torch.distributions import Categorical
-from agents import BackgammonPolicyNetwork
+from .policy_network import BackgammonPolicyNetwork
 from config import *
 
 
