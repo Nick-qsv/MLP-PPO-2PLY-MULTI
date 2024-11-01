@@ -56,7 +56,7 @@ class Worker:
 
             # Put the episode into the ExperienceQueue
             self.experience_queue.put(episode)
-
+            print(f"Worker {self.worker_id} added an episode to the queue.")
             # At the end of the episode, check for updated parameters
             new_version = self.parameter_manager.get_version()
             if new_version > self.current_version:

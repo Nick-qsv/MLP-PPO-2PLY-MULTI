@@ -61,10 +61,12 @@ def main():
 
     """
     pynvml.nvmlInit()
+    # Initialize multiprocessing manager
+    manager = multiprocessing.Manager()
     # Initialize parameter manager, ring replay buffer, and experience queue
     parameter_manager = ParameterManager()
     replay_buffer = RingReplayBuffer(max_size=10000)
-    experience_queue = ExperienceQueue()
+    experience_queue = ExperienceQueue(manager)
     # Create and start worker processes
     workers = [
         Worker(
@@ -104,6 +106,7 @@ def main():
             episode = experience_queue.get(timeout=1)
             replay_buffer.add_episode(episode)
             episode_count += 1
+            print(f"Episode count incremented to: {episode_count}")  # Debug statement
 
             # Check if replay_buffer has reached 1,000 episodes
             if len(replay_buffer.buffer) >= 1000:
@@ -115,15 +118,10 @@ def main():
 
         except queue.Empty:
             # No new episodes in the ExperienceQueue
+            print("Experience queue is empty. Waiting for episodes...")
             pass
 
-        # Check if it's time to save the model
-        if episode_count % MODEL_SAVE_FREQUENCY == 0 and episode_count != 0:
-            # Save model to S3 or local storage
-            print(f"Saving model at episode {episode_count}")
-            # parameter_manager.save_model()
-
-        if episode_count % 100 == 0:
+        if episode_count % 100 == 0 and episode_count != 0:
             current_time = time.time()
             elapsed = current_time - last_print_time
             eps_per_sec = 100 / elapsed if elapsed > 0 else float("inf")

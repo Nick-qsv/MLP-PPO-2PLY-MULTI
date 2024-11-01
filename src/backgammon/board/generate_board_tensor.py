@@ -98,13 +98,13 @@ def compute_features(p0, p1, b, bo, current_player):
     """
     Computes the 198-dimensional feature vector for the board state.
     """
-    features = np.zeros(198, dtype=np.float32)
+    features = torch.zeros(198, dtype=torch.float32)
     feature_index = 0
 
     for player_idx, player_positions in enumerate([p0, p1]):
         for point_idx in range(24):
             checkers = player_positions[point_idx]
-            features_slice = np.zeros(4, dtype=np.float32)
+            features_slice = torch.zeros(4, dtype=torch.float32)
 
             if checkers == 1:
                 features_slice[0] = 1.0
