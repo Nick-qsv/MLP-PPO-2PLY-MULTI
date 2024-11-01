@@ -1,11 +1,9 @@
 import torch
 import torch.nn.functional as F
 from torch.distributions import Categorical
-import multiprocessing
-import threading
 from environments import Episode, Experience, BackgammonEnv
 from agents import BackgammonPolicyNetwork
-from config import USE_SIGMOID
+from config import USE_SIGMOID, MAX_TIMESTEPS
 
 
 class Worker:
@@ -68,22 +66,13 @@ class Worker:
                     f"Worker {self.worker_id}: Updated parameters to version {self.current_version}"
                 )
 
-    def play_episode(self, env):
-        """
-        Plays a single episode in the environment.
-
-        Args:
-            env (BackgammonEnv): The environment instance.
-
-        Returns:
-            Episode: An Episode object containing all experiences from the episode.
-        """
+    def play_episode(self, env, max_steps=MAX_TIMESTEPS):
         episode = Episode()
         observation = env.reset()
         done = False
+        step_count = 0
 
-        while not done:
-            # Get action mask
+        while not done and step_count < max_steps:
             action_mask = env.action_mask.clone()
             legal_moves = env.legal_moves
 
@@ -97,15 +86,15 @@ class Worker:
             else:
                 # Use PolicyNetwork to select action
                 observation_tensor = observation.unsqueeze(0).to(self.device)
-                action_mask_tensor = action_mask.unsqueeze(0).to(self.device)
 
                 with torch.no_grad():
                     logits, state_value = self.policy_network(observation_tensor)
                     logits = logits.squeeze(0)
                     state_value = state_value.squeeze(0)
 
-                    # Apply action mask
-                    masked_logits = logits + (action_mask.to(self.device) - 1) * 1e10
+                    # Properly mask invalid actions
+                    masked_logits = logits.clone()
+                    masked_logits[action_mask == 0] = -float("inf")
 
                     # Compute probabilities
                     action_probs = F.softmax(masked_logits, dim=-1)
@@ -114,6 +103,7 @@ class Worker:
                     m = Categorical(action_probs)
                     action = m.sample()
                     action_log_prob = m.log_prob(action)
+                    print(f"Worker {self.worker_id}: Selected action {action.item()}")
 
                 # Take action in env
                 next_observation, reward, done, info = env.step(action.item())
@@ -144,5 +134,8 @@ class Worker:
 
             # Move to next observation
             observation = next_observation
+            step_count += 1
 
+        if step_count >= max_steps:
+            print(f"Worker {self.worker_id}: Reached maximum steps in episode.")
         return episode

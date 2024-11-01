@@ -106,7 +106,7 @@ class BackgammonEnv(gym.Env):
         info = {"current_player": self.current_player}
 
         if self.game_over:
-            observation = self.reset()
+            observation = self.get_observation()
             return observation, torch.tensor(0.0, device=self.device), True, info
 
         # Check if there are any legal actions
