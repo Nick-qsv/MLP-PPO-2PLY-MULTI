@@ -327,21 +327,27 @@ class BackgammonEnv(gym.Env):
 
                 # Check devices
                 print(f"Worker {self.worker_id}: self.device = {self.device}")
+                print(f"Worker {self.worker_id}: self.device.type = {self.device.type}")
                 print(
                     f"Worker {self.worker_id}: self.legal_board_features.device = {self.legal_board_features.device}"
                 )
+                print(
+                    f"Worker {self.worker_id}: self.legal_board_features.device.type = {self.legal_board_features.device.type}"
+                )
 
                 # Ensure legal_board_features is on the correct device
-                if self.legal_board_features.device != torch.device("cpu"):
+                if self.legal_board_features.device.type != self.device.type:
                     print(
-                        f"Worker {self.worker_id}: Moving legal_board_features to CPU"
+                        f"Worker {self.worker_id}: Moving legal_board_features to {self.device}"
                     )
-                    self.legal_board_features = self.legal_board_features.to("cpu")
+                    self.legal_board_features = self.legal_board_features.to(
+                        self.device
+                    )
 
                 padding = torch.zeros(
                     (padding_length, self.legal_board_features.size(1)),
                     dtype=self.legal_board_features.dtype,
-                    device="cpu",
+                    device=self.device,
                 )
                 print(f"Worker {self.worker_id}: padding.device = {padding.device}")
 
