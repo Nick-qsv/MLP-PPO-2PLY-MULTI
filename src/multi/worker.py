@@ -17,7 +17,7 @@ class Worker:
     This class is designed to be scalable across multiple CPUs.
     """
 
-    def __init__(self, worker_id, parameter_manager, experience_queue, device=None):
+    def __init__(self, worker_id, parameter_manager, experience_queue):
         """
         Initializes the Worker.
 
@@ -30,7 +30,7 @@ class Worker:
         self.worker_id = worker_id
         self.parameter_manager = parameter_manager
         self.experience_queue = experience_queue
-        self.device = device if device is not None else torch.device("cpu")
+        self.device = torch.device("cpu")
 
         # Initialize local PolicyNetwork
         self.policy_network = BackgammonPolicyNetwork(use_sigmoid=USE_SIGMOID).to(
