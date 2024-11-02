@@ -1,9 +1,27 @@
 from backgammon.types.moves import Player, FullMove
 from backgammon.board.immutable_board import ImmutableBoard
+import torch
+from typing import List
 
 
-def get_opponent(player: Player) -> Player:
-    return Player.PLAYER2 if player == Player.PLAYER1 else Player.PLAYER1
+def generate_all_board_features(
+    board: ImmutableBoard,
+    current_player: Player,
+    legal_moves: List[FullMove],
+) -> torch.Tensor:
+    """
+    Generates a tensor of all possible board features based on legal moves.
+    """
+    N = len(legal_moves)
+    features = torch.zeros(N, 198, dtype=torch.float32, device=board.device)
+    for i, full_move in enumerate(legal_moves):
+        # Apply the full move to a copy of the board
+        new_board = execute_full_move_on_board_copy(board, full_move)
+        # Get the feature vector of the new board state
+        feature_vector = new_board.get_board_features(current_player)
+        # Store the feature vector in the features tensor
+        features[i] = feature_vector
+    return features
 
 
 def execute_full_move_on_board_copy(
@@ -76,3 +94,7 @@ def check_for_backgammon(board: ImmutableBoard, player: Player) -> bool:
         return True  # Opponent has checkers on the bar
 
     return False  # No checkers in home board or on the bar
+
+
+def get_opponent(player: Player) -> Player:
+    return Player.PLAYER2 if player == Player.PLAYER1 else Player.PLAYER1

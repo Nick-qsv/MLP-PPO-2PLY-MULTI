@@ -6,12 +6,12 @@ from typing import Dict
 from backgammon.board.immutable_board import ImmutableBoard
 from backgammon.moves.conditions import Player, get_opponent
 from backgammon.moves.generate_all_moves import get_all_possible_moves
-from backgammon.board.generate_board_tensor import generate_all_board_features
 from .env_helper import (
     execute_full_move_on_board_copy,
     check_game_over,
     check_for_gammon,
     check_for_backgammon,
+    generate_all_board_features,
 )
 
 REWARD_PASS = 0.0
@@ -24,7 +24,9 @@ REWARD_WIN_NORMAL = 1.0
 class BackgammonEnv(gym.Env):
     metadata = {"render.modes": ["human"]}
 
-    def __init__(self, match_length=15, max_legal_moves=500, device=None):
+    def __init__(
+        self, worker_id=None, match_length=15, max_legal_moves=500, device=None
+    ):
         super(BackgammonEnv, self).__init__()
 
         self.match_length = match_length
@@ -64,7 +66,11 @@ class BackgammonEnv(gym.Env):
         self.legal_board_features = None  # Tensor of possible next board features
         self.legal_moves = []  # List of FullMove objects
 
+        self.worker_id = worker_id
+
     def reset(self):
+        print(f"Worker {self.worker_id}: Entered env.reset()")
+
         if self.match_over:
             self.player_scores = {Player.PLAYER1: 0, Player.PLAYER2: 0}
             self.match_over = False
@@ -78,9 +84,13 @@ class BackgammonEnv(gym.Env):
         self.current_player = (
             Player.PLAYER1 if self.current_player == Player.PLAYER2 else Player.PLAYER2
         )
+        print(f"Worker {self.worker_id}: Current player set to {self.current_player}")
 
         # Roll dice to determine who starts
         self.roll_dice()
+        print(
+            f"Worker {self.worker_id}: Initial dice roll for starting player: {self.roll_result}"
+        )
         while self.roll_result[0] == self.roll_result[1]:
             self.roll_dice()
 
@@ -97,8 +107,10 @@ class BackgammonEnv(gym.Env):
 
         # Update legal moves and board features based on the first non-doubles roll
         self.update_legal_moves()
+        print(f"Worker {self.worker_id}: Updated legal moves")
 
         observation = self.get_observation()
+        print(f"Worker {self.worker_id}: Exiting env.reset()")
         return observation
 
     def step(self, action):
@@ -186,12 +198,15 @@ class BackgammonEnv(gym.Env):
         return board_features.to(self.device)  # Ensure tensor is on the correct device
 
     def update_legal_moves(self):
+        print(f"Worker {self.worker_id}: Entered update_legal_moves()")
+
         # Generate legal moves
         self.legal_moves = get_all_possible_moves(
             player=self.current_player,
             board=self.board,
             roll_result=self.roll_result,
         )
+        print(f"Worker {self.worker_id}: Generated {len(self.legal_moves)} legal moves")
 
         # Generate legal board features for the action mask
         self.legal_board_features = (
@@ -202,6 +217,9 @@ class BackgammonEnv(gym.Env):
             )
             if self.legal_moves
             else torch.empty((0, 198), dtype=torch.float32, device=self.device)
+        )
+        print(
+            f"Worker {self.worker_id}: Generated {len(self.legal_board_features)} legal board features"
         )
 
         num_moves = self.legal_board_features.size(0)

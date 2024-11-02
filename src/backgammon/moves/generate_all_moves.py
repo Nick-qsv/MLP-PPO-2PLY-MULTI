@@ -63,7 +63,6 @@ def get_all_possible_moves(
 
         # **Apply Filtering Using Helper Function**
         full_moves = filter_full_moves_by_max_submoves(full_moves)
-
     return full_moves
 
 

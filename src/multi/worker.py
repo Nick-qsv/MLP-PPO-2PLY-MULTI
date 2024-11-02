@@ -4,6 +4,8 @@ from torch.distributions import Categorical
 from environments import Episode, Experience, BackgammonEnv
 from agents import BackgammonPolicyNetwork
 from config import USE_SIGMOID, MAX_TIMESTEPS
+import time
+import traceback
 
 
 class Worker:
@@ -46,8 +48,8 @@ class Worker:
         Main loop for the worker. Runs continuously, playing episodes and checking for parameter updates.
         """
         # Create environment
-        env = BackgammonEnv(device=self.device)
-
+        env = BackgammonEnv(worker_id=self.worker_id, device=self.device)
+        print(f"Worker {self.worker_id} starting.")
         while True:
             # Play an episode
             episode = self.play_episode(env)
@@ -67,12 +69,16 @@ class Worker:
                 )
 
     def play_episode(self, env, max_steps=MAX_TIMESTEPS):
+        print(f"Worker {self.worker_id}: Starting play_episode")
         episode = Episode()
         observation = env.reset()
+        print(f"Worker {self.worker_id}: After env.reset()")
+
         done = False
         step_count = 0
 
         while not done and step_count < max_steps:
+            print(f"Worker {self.worker_id}: At step {step_count}")
             action_mask = env.action_mask.clone()
             legal_moves = env.legal_moves
 

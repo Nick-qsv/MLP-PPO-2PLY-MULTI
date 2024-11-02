@@ -150,24 +150,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-# 7 workers running individual games
-# uploading experiences grouped into episodes to experience queue
-# update the policy network and value network using the Trainer class, which passes the updated state_dict to the multiprocessingManager using a lock to update the state_dict parameters
-# workers periodically check the version number of the Manager after every episodeand if there is a new version, they update their local copy of the parameters
-# ring replay buffer storing episodes from the workers, with a maxsize=10000
-# when a certain number of episodes are inside the ring buffer, grab the episodes, convert to serialize the data, run an update on the GPU through the Trainer class
-# Trainer passes updated state_dict to multiprocessingManage
-# all during this update, workers keep on running games and uploading experiences to the queue
-# if the number of episodes used in updates % 100,000, upload the current model to S3
-# when episode 1 million is reached, stop the training
-
-# every worker has its own instance of the ppo agent class with the policy and value network
-# thread safe because the params have a lock only for writes, when the workers update their local copy of the parameters, they don't need to take a lock
-
-# There will be a multiprocessing.Manager() that has a state_dict of the parameters and a version number Value
-# the Trainer will have a lock on this manager and will update the parameters and increment the version number
-# the workers will keep polling the manager for the new parameters and the new version number
-# when the version number is different from the one they have, they will update their parameters and the version number
-# they don't need to take a lock because they are only reading and updating their own local copy

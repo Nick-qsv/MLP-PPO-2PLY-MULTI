@@ -3,9 +3,10 @@ import torch
 from typing import List
 from src.backgammon.board.immutable_board import ImmutableBoard
 from src.backgammon.types import FullMove, Player, Position
+import time
 
 
-def generate_all_board_features(
+def generate_all_board_features_deprecated(
     board: ImmutableBoard,
     current_player: Player,
     legal_moves: List[FullMove],
