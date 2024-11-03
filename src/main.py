@@ -1,5 +1,5 @@
 import multiprocessing
-from multi import ParameterManager, Worker, ExperienceQueue
+from multi import ParameterManager, Worker, ExperienceQueue, worker_function
 from agents import Trainer
 from utils import RingReplayBuffer
 from config import *
@@ -68,17 +68,11 @@ def main():
     replay_buffer = RingReplayBuffer(max_size=10000)
     experience_queue = ExperienceQueue(manager)
     # Create and start worker processes
-    workers = [
-        Worker(
-            worker_id=i,
-            parameter_manager=parameter_manager,
-            experience_queue=experience_queue,
-        )
-        for i in range(7)
-    ]
     worker_processes = []
-    for worker in workers:
-        worker_process = multiprocessing.Process(target=worker.run)
+    for i in range(7):
+        worker_process = multiprocessing.Process(
+            target=worker_function, args=(i, parameter_manager, experience_queue)
+        )
         worker_process.start()
         worker_processes.append(worker_process)
 
@@ -149,4 +143,9 @@ def main():
 
 
 if __name__ == "__main__":
+    try:
+        multiprocessing.set_start_method("spawn")
+    except RuntimeError:
+        # Start method has already been set
+        pass
     main()

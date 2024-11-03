@@ -4,8 +4,6 @@ from torch.distributions import Categorical
 from environments import Episode, Experience, BackgammonEnv
 from agents import BackgammonPolicyNetwork
 from config import USE_SIGMOID, MAX_TIMESTEPS
-import time
-import traceback
 
 
 class Worker:
@@ -32,21 +30,16 @@ class Worker:
         self.experience_queue = experience_queue
         self.device = torch.device("cpu")
 
-        # Initialize local PolicyNetwork
-        self.policy_network = BackgammonPolicyNetwork(use_sigmoid=USE_SIGMOID).to(
-            self.device
-        )
-        # Load initial parameters from the ParameterManager
-        state_dict = self.parameter_manager.get_parameters()
-        self.policy_network.load_state_dict(state_dict)
-
-        # Keep track of the version number
-        self.current_version = self.parameter_manager.get_version()
-
     def run(self):
         """
         Main loop for the worker. Runs continuously, playing episodes and checking for parameter updates.
         """
+        self.policy_network = BackgammonPolicyNetwork(use_sigmoid=USE_SIGMOID).to(
+            self.device
+        )
+        state_dict = self.parameter_manager.get_parameters()
+        self.policy_network.load_state_dict(state_dict)
+        self.current_version = self.parameter_manager.get_version()
         # Create environment
         env = BackgammonEnv(worker_id=self.worker_id, device=self.device)
         print(f"Worker {self.worker_id} starting.")
@@ -145,3 +138,8 @@ class Worker:
         if step_count >= max_steps:
             print(f"Worker {self.worker_id}: Reached maximum steps in episode.")
         return episode
+
+
+def worker_function(worker_id, parameter_manager, experience_queue):
+    worker = Worker(worker_id, parameter_manager, experience_queue)
+    worker.run()
