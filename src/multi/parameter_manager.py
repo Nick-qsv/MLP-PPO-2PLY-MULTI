@@ -41,8 +41,7 @@ class ParameterManager:
         for key, tensor in state_dict.items():
             self.parameters[key] = tensor.cpu().numpy()
 
-        # Initialize S3 client attributes (set them according to your configuration)
-        self.s3_client = boto3.client("s3")  # or pass as an argument
+        # Remove s3_client from the constructor
         self.s3_bucket_name = S3_BUCKET_NAME
         self.s3_model_prefix = S3_MODEL_PREFIX
 
@@ -82,7 +81,7 @@ class ParameterManager:
             # Increment the version number
             self.version.value += 1
 
-    # --- New methods for saving and loading ---
+    # --- Modified methods for saving and loading ---
 
     def save_model_local(self, filename=None):
         """
@@ -129,9 +128,8 @@ class ParameterManager:
         Args:
             filename (str): Optional filename. Defaults to 'ppo_backgammon_s3.pth'.
         """
-        if not self.s3_client:
-            print("S3 client not initialized. Cannot save to S3.")
-            return
+        # Initialize s3_client here
+        s3_client = boto3.client("s3")
 
         state_dict = self.get_parameters()
 
@@ -146,7 +144,7 @@ class ParameterManager:
         print(f"Uploading model to s3://{self.s3_bucket_name}/{s3_key}...")
 
         try:
-            self.s3_client.upload_fileobj(buffer, self.s3_bucket_name, s3_key)
+            s3_client.upload_fileobj(buffer, self.s3_bucket_name, s3_key)
             print(f"Model saved to s3://{self.s3_bucket_name}/{s3_key}")
         except Exception as e:
             print(f"Failed to save model to S3: {e}")
@@ -158,9 +156,8 @@ class ParameterManager:
         Args:
             filename (str): Optional filename. Defaults to 'ppo_backgammon_s3.pth'.
         """
-        if not self.s3_client:
-            print("S3 client not initialized. Cannot load from S3.")
-            return
+        # Initialize s3_client here
+        s3_client = boto3.client("s3")
 
         if filename is None:
             filename = "ppo_backgammon_s3.pth"
@@ -169,7 +166,7 @@ class ParameterManager:
         buffer = io.BytesIO()
 
         try:
-            self.s3_client.download_fileobj(self.s3_bucket_name, s3_key, buffer)
+            s3_client.download_fileobj(self.s3_bucket_name, s3_key, buffer)
             buffer.seek(0)
             state_dict = torch.load(buffer, map_location=torch.device("cpu"))
             self.set_parameters(state_dict)
