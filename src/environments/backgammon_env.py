@@ -13,6 +13,7 @@ from .env_helper import (
     check_for_backgammon,
     generate_all_board_features,
 )
+import time
 
 REWARD_PASS = 0.0
 REWARD_INVALID_ACTION = -1.0
@@ -71,6 +72,7 @@ class BackgammonEnv(gym.Env):
         self.legal_moves = []  # List of FullMove objects
 
         self.worker_id = worker_id
+        self.profiling_data = {}
 
     def reset(self):
 
@@ -197,7 +199,8 @@ class BackgammonEnv(gym.Env):
     def update_legal_moves(self):
         # Generate legal moves
         try:
-            self.legal_moves = get_all_possible_moves(
+            self.legal_moves = self.profile_call(
+                get_all_possible_moves,
                 player=self.current_player,
                 board=self.board,
                 roll_result=self.roll_result,
@@ -209,7 +212,8 @@ class BackgammonEnv(gym.Env):
         # Generate legal board features for the action mask
         try:
             if self.legal_moves:
-                self.legal_board_features = generate_all_board_features(
+                self.legal_board_features = self.profile_call(
+                    generate_all_board_features,
                     board=self.board,
                     current_player=self.current_player,
                     legal_moves=self.legal_moves,
@@ -276,3 +280,15 @@ class BackgammonEnv(gym.Env):
 
     def pass_turn(self):
         self.current_player = get_opponent(self.current_player)
+
+    def profile_call(self, func, *args, **kwargs):
+        start_time = time.perf_counter()
+        result = func(*args, **kwargs)
+        end_time = time.perf_counter()
+        elapsed = end_time - start_time
+        func_name = func.__name__
+        if func_name not in self.profiling_data:
+            self.profiling_data[func_name] = {"total_time": 0.0, "call_count": 0}
+        self.profiling_data[func_name]["total_time"] += elapsed
+        self.profiling_data[func_name]["call_count"] += 1
+        return result

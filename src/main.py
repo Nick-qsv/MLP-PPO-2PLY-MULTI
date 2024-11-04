@@ -139,7 +139,7 @@ def main():
             episode_count += 1
             print(f"Episode count incremented to: {episode_count}")  # Debug statement
             # print_disk_usage()
-            print_shared_memory_usage()
+            # print_shared_memory_usage()
             # Check if replay_buffer has reached 1,000 episodes
             if len(replay_buffer.buffer) >= 1000:
                 # Drain the buffer and push episodes to the Trainer

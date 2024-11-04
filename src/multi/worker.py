@@ -137,6 +137,20 @@ class Worker:
 
         # Convert tensors to NumPy arrays before returning the episode
         episode.to_numpy()
+
+        # Print profiling data
+        print(f"Worker {self.worker_id} profiling data for this episode:")
+        for func_name, data in env.profiling_data.items():
+            total_time = data["total_time"]
+            call_count = data["call_count"]
+            avg_time = total_time / call_count if call_count else 0
+            print(
+                f"{func_name}: Total Time = {total_time:.6f}s, Calls = {call_count}, Average Time = {avg_time:.6f}s"
+            )
+
+        # Reset profiling data for the next episode
+        env.profiling_data = {}
+
         return episode
 
 
