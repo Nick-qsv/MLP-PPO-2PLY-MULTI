@@ -201,70 +201,13 @@ class BackgammonEnv(gym.Env):
         board_features = self.board.get_board_features(self.current_player)
         return board_features.to(self.device)  # Ensure tensor is on the correct device
 
-    def update_legal_moves_np(self):
-        print(f"Worker {self.worker_id}: Entered update_legal_moves()")
-
-        # Generate legal moves
-        self.legal_moves = get_all_possible_moves(
-            player=self.current_player,
-            board=self.board,
-            roll_result=self.roll_result,
-        )
-        print(f"Worker {self.worker_id}: Generated {len(self.legal_moves)} legal moves")
-
-        # Generate legal board features for the action mask
-        self.legal_board_features = (
-            generate_all_board_features(
-                board=self.board,
-                current_player=self.current_player,
-                legal_moves=self.legal_moves,
-            )
-            if self.legal_moves
-            else torch.empty((0, 198), dtype=torch.float32, device=self.device)
-        )
-        print(
-            f"Worker {self.worker_id}: Generated {len(self.legal_board_features)} legal board features"
-        )
-
-        num_moves = self.legal_board_features.size(0)
-        if num_moves > self.max_legal_moves:
-            self.legal_board_features = self.legal_board_features[
-                : self.max_legal_moves, :
-            ]
-            self.legal_moves = self.legal_moves[: self.max_legal_moves]
-
-        num_moves = self.legal_board_features.size(0)
-
-        # Update action_mask
-        self.action_mask = torch.zeros(
-            self.max_legal_moves, dtype=torch.float32, device=self.device
-        )
-        self.action_mask[:num_moves] = 1.0
-
-        # If there are fewer moves than max_legal_moves, pad the features
-        if num_moves < self.max_legal_moves:
-            padding_length = self.max_legal_moves - num_moves
-            padding = torch.zeros(
-                (padding_length, self.legal_board_features.size(1)),
-                dtype=self.legal_board_features.dtype,
-                device=self.device,
-            )
-            self.legal_board_features = torch.cat(
-                [self.legal_board_features, padding], dim=0
-            )
-
     def update_legal_moves(self):
-        print(f"Worker {self.worker_id}: Entered update_legal_moves()")
-
         # Generate legal moves
         try:
             self.legal_moves = get_all_possible_moves(
                 player=self.current_player,
                 board=self.board,
                 roll_result=self.roll_result,
-            )
-            print(
-                f"Worker {self.worker_id}: Generated {len(self.legal_moves)} legal moves"
             )
         except Exception as e:
             print(f"Worker {self.worker_id}: Error in get_all_possible_moves: {e}")
@@ -278,17 +221,17 @@ class BackgammonEnv(gym.Env):
                     current_player=self.current_player,
                     legal_moves=self.legal_moves,
                 )
-                print(f"Worker {self.worker_id}: Generated legal board features")
+                # print(f"Worker {self.worker_id}: Generated legal board features")
             else:
                 self.legal_board_features = torch.empty(
                     (0, 198), dtype=torch.float32, device=self.device
                 )
-                print(
-                    f"Worker {self.worker_id}: No legal moves, generated empty board features"
-                )
-            print(
-                f"Worker {self.worker_id}: Legal board features shape: {self.legal_board_features.shape}"
-            )
+                # print(
+                #     f"Worker {self.worker_id}: No legal moves, generated empty board features"
+                # )
+            # print(
+            #     f"Worker {self.worker_id}: Legal board features shape: {self.legal_board_features.shape}"
+            # )
         except Exception as e:
             print(f"Worker {self.worker_id}: Error in generate_all_board_features: {e}")
             return
@@ -296,23 +239,23 @@ class BackgammonEnv(gym.Env):
         # Truncate legal moves and board features if they exceed max_legal_moves
         num_moves = self.legal_board_features.size(0)
         if num_moves > self.max_legal_moves:
-            print(f"Worker {self.worker_id}: Truncating legal moves and board features")
+            # print(f"Worker {self.worker_id}: Truncating legal moves and board features")
             self.legal_board_features = self.legal_board_features[
                 : self.max_legal_moves, :
             ]
             self.legal_moves = self.legal_moves[: self.max_legal_moves]
-        print(
-            f"Worker {self.worker_id}: Final number of legal moves: {len(self.legal_moves)}"
-        )
+        # print(
+        #     f"Worker {self.worker_id}: Final number of legal moves: {len(self.legal_moves)}"
+        # )
 
         # Update action_mask
         try:
-            print(f"Worker {self.worker_id}: self.device = {self.device}")
+            # print(f"Worker {self.worker_id}: self.device = {self.device}")
             self.action_mask = torch.zeros(
                 self.max_legal_moves, dtype=torch.float32, device=self.device
             )
             self.action_mask[:num_moves] = 1.0
-            print(f"Worker {self.worker_id}: Action mask updated")
+            # print(f"Worker {self.worker_id}: Action mask updated")
         except Exception as e:
             print(f"Worker {self.worker_id}: Error updating action_mask: {e}")
             return
@@ -321,47 +264,19 @@ class BackgammonEnv(gym.Env):
         try:
             if num_moves < self.max_legal_moves:
                 padding_length = self.max_legal_moves - num_moves
-                print(
-                    f"Worker {self.worker_id}: num_moves = {num_moves}, padding_length = {padding_length}"
-                )
-
-                # Check devices
-                print(f"Worker {self.worker_id}: self.device = {self.device}")
-                print(f"Worker {self.worker_id}: self.device.type = {self.device.type}")
-                print(
-                    f"Worker {self.worker_id}: self.legal_board_features.device = {self.legal_board_features.device}"
-                )
-                print(
-                    f"Worker {self.worker_id}: self.legal_board_features.device.type = {self.legal_board_features.device.type}"
-                )
-
-                # Ensure legal_board_features is on the correct device
-                if self.legal_board_features.device.type != self.device.type:
-                    print(
-                        f"Worker {self.worker_id}: Moving legal_board_features to {self.device}"
-                    )
-                    self.legal_board_features = self.legal_board_features.to(
-                        self.device
-                    )
 
                 padding = torch.zeros(
                     (padding_length, self.legal_board_features.size(1)),
                     dtype=self.legal_board_features.dtype,
                     device=self.device,
                 )
-                print(f"Worker {self.worker_id}: padding.device = {padding.device}")
 
                 self.legal_board_features = torch.cat(
                     [self.legal_board_features, padding], dim=0
                 )
-                print(
-                    f"Worker {self.worker_id}: Padded legal board features to max_legal_moves"
-                )
         except Exception as e:
             print(f"Worker {self.worker_id}: Error during padding: {e}")
             return
-
-        print(f"Worker {self.worker_id}: Exiting update_legal_moves()")
 
     def roll_dice(self):
         self.roll_result = [np.random.randint(1, 7), np.random.randint(1, 7)]

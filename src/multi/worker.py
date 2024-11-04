@@ -62,16 +62,13 @@ class Worker:
                 )
 
     def play_episode(self, env, max_steps=MAX_TIMESTEPS):
-        print(f"Worker {self.worker_id}: Starting play_episode")
         episode = Episode()
         observation = env.reset()
-        print(f"Worker {self.worker_id}: After env.reset()")
 
         done = False
         step_count = 0
 
         while not done and step_count < max_steps:
-            print(f"Worker {self.worker_id}: At step {step_count}")
             action_mask = env.action_mask.clone()
             legal_moves = env.legal_moves
 
@@ -102,7 +99,7 @@ class Worker:
                     m = Categorical(action_probs)
                     action = m.sample()
                     action_log_prob = m.log_prob(action)
-                    print(f"Worker {self.worker_id}: Selected action {action.item()}")
+                    # print(f"Worker {self.worker_id}: Selected action {action.item()}")
 
                 # Take action in env
                 next_observation, reward, done, info = env.step(action.item())
