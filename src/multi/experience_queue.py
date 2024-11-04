@@ -1,6 +1,10 @@
+# experience_queue.py
+from multiprocessing import Queue
+
+
 class ExperienceQueue:
-    def __init__(self, manager):
-        self.queue = manager.Queue()
+    def __init__(self):
+        self.queue = Queue()
 
     def put(self, episode):
         self.queue.put(episode)

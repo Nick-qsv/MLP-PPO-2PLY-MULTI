@@ -7,6 +7,23 @@ import time
 import torch
 import queue
 import pynvml
+import shutil
+
+
+def print_disk_usage():
+    total, used, free = shutil.disk_usage("/")
+    print("*******Disk Space Usage:*******")
+    print(f"Total: {total / (1024**3):.2f} GB")
+    print(f"Used: {used / (1024**3):.2f} GB")
+    print(f"Free: {free / (1024**3):.2f} GB")
+
+
+def print_shared_memory_usage():
+    total, used, free = shutil.disk_usage("/dev/shm")
+    print("*******Shared Memory Usage:*******")
+    print(f"Total: {total / (1024**3):.2f} GB")
+    print(f"Used: {used / (1024**3):.2f} GB")
+    print(f"Free: {free / (1024**3):.2f} GB")
 
 
 def main():
@@ -82,7 +99,7 @@ def main():
 
     # Initialize ring replay buffer and experience queue
     replay_buffer = RingReplayBuffer(max_size=10000)
-    experience_queue = ExperienceQueue(manager)
+    experience_queue = ExperienceQueue()
 
     # Create and start worker processes
     worker_processes = []
@@ -115,10 +132,14 @@ def main():
         # Try to get episodes from the ExperienceQueue
         try:
             episode = experience_queue.get(timeout=1)
+            # **Convert NumPy arrays back to tensors**
+            episode.to_tensor()
+
             replay_buffer.add_episode(episode)
             episode_count += 1
             print(f"Episode count incremented to: {episode_count}")  # Debug statement
-
+            # print_disk_usage()
+            print_shared_memory_usage()
             # Check if replay_buffer has reached 1,000 episodes
             if len(replay_buffer.buffer) >= 1000:
                 # Drain the buffer and push episodes to the Trainer

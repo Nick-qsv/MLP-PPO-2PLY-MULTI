@@ -73,7 +73,6 @@ class BackgammonEnv(gym.Env):
         self.worker_id = worker_id
 
     def reset(self):
-        print(f"Worker {self.worker_id}: Entered env.reset()")
 
         if self.match_over:
             self.player_scores = {Player.PLAYER1: 0, Player.PLAYER2: 0}
@@ -88,13 +87,9 @@ class BackgammonEnv(gym.Env):
         self.current_player = (
             Player.PLAYER1 if self.current_player == Player.PLAYER2 else Player.PLAYER2
         )
-        print(f"Worker {self.worker_id}: Current player set to {self.current_player}")
 
         # Roll dice to determine who starts
         self.roll_dice()
-        print(
-            f"Worker {self.worker_id}: Initial dice roll for starting player: {self.roll_result}"
-        )
         while self.roll_result[0] == self.roll_result[1]:
             self.roll_dice()
 
@@ -111,10 +106,8 @@ class BackgammonEnv(gym.Env):
 
         # Update legal moves and board features based on the first non-doubles roll
         self.update_legal_moves()
-        print(f"Worker {self.worker_id}: Updated legal moves")
 
         observation = self.get_observation()
-        print(f"Worker {self.worker_id}: Exiting env.reset()")
         return observation
 
     def step(self, action):

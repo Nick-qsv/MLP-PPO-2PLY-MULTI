@@ -134,6 +134,9 @@ class Worker:
 
         if step_count >= max_steps:
             print(f"Worker {self.worker_id}: Reached maximum steps in episode.")
+
+        # Convert tensors to NumPy arrays before returning the episode
+        episode.to_numpy()
         return episode
 
 
