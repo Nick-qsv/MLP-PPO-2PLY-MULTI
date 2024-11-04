@@ -57,7 +57,7 @@ class BackgammonEnv(gym.Env):
             low=-1.0,
             high=1.0,
             shape=(board_feature_length,),
-            dtype=np.float32,
+            dtype=np.float16,
         )
 
         # Action space
@@ -66,7 +66,7 @@ class BackgammonEnv(gym.Env):
         # Variables for dice roll and legal moves
         self.roll_result = None
         self.action_mask = torch.zeros(
-            self.max_legal_moves, dtype=torch.float32, device=self.device
+            self.max_legal_moves, dtype=torch.float16, device=self.device
         )
         self.legal_board_features = None  # Tensor of possible next board features
         self.legal_moves = []  # List of FullMove objects
@@ -215,13 +215,13 @@ class BackgammonEnv(gym.Env):
             )
         else:
             self.legal_board_features = torch.empty(
-                (0, 198), dtype=torch.float32, device=self.device
+                (0, 198), dtype=torch.float16, device=self.device
             )
 
         # Update action_mask (no need to pad)
         num_moves = self.legal_board_features.size(0)
         self.action_mask = torch.ones(
-            num_moves, dtype=torch.float32, device=self.device
+            num_moves, dtype=torch.float16, device=self.device
         )
 
     def update_legal_moves(self):
@@ -248,7 +248,7 @@ class BackgammonEnv(gym.Env):
                 )
             else:
                 self.legal_board_features = torch.empty(
-                    (0, 198), dtype=torch.float32, device=self.device
+                    (0, 198), dtype=torch.float16, device=self.device
                 )
         except Exception as e:
             print(f"Worker {self.worker_id}: Error in generate_all_board_features: {e}")
@@ -269,7 +269,7 @@ class BackgammonEnv(gym.Env):
         try:
             # print(f"Worker {self.worker_id}: self.device = {self.device}")
             self.action_mask = torch.zeros(
-                self.max_legal_moves, dtype=torch.float32, device=self.device
+                self.max_legal_moves, dtype=torch.float16, device=self.device
             )
             self.action_mask[:num_moves] = 1.0
             # print(f"Worker {self.worker_id}: Action mask updated")

@@ -15,7 +15,7 @@ def generate_all_board_features_deprecated(
     Generates a tensor of all possible board features based on legal moves.
     """
     N = len(legal_moves)
-    features = torch.zeros(N, 198, dtype=torch.float32)
+    features = torch.zeros(N, 198, dtype=torch.float16)
 
     # Convert board positions to NumPy arrays for efficient manipulation
     positions_0_initial = np.array(board.positions_0, dtype=np.int8)
@@ -99,13 +99,13 @@ def compute_features(p0, p1, b, bo, current_player):
     """
     Computes the 198-dimensional feature vector for the board state.
     """
-    features = torch.zeros(198, dtype=torch.float32)
+    features = torch.zeros(198, dtype=torch.float16)
     feature_index = 0
 
     for player_idx, player_positions in enumerate([p0, p1]):
         for point_idx in range(24):
             checkers = player_positions[point_idx]
-            features_slice = torch.zeros(4, dtype=torch.float32)
+            features_slice = torch.zeros(4, dtype=torch.float16)
 
             if checkers == 1:
                 features_slice[0] = 1.0

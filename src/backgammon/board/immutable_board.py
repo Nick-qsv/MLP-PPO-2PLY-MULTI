@@ -69,7 +69,7 @@ class ImmutableBoard:
         Returns:
             torch.Tensor: A tensor of shape (198,) representing the board features.
         """
-        features = torch.zeros(198, dtype=torch.float32, device=self.device)
+        features = torch.zeros(198, dtype=torch.float16, device=self.device)
         feature_index = 0
 
         # Process both players' positions
@@ -81,7 +81,7 @@ class ImmutableBoard:
 
             # Initialize a (24, 4) feature slice for points
             features_slice = torch.zeros(
-                (24, 4), dtype=torch.float32, device=self.device
+                (24, 4), dtype=torch.float16, device=self.device
             )
 
             # Vectorized computation for point features
