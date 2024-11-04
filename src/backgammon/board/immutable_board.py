@@ -117,13 +117,16 @@ class ImmutableBoard:
         return features
 
     def move_checker(self, player: Player, sub_move: SubMove) -> "ImmutableBoard":
-        # Implementation remains the same as before
         positions_0, positions_1 = list(self.positions_0), list(self.positions_1)
         bar, borne_off = list(self.bar), list(self.borne_off)
 
         player_idx = player.value
         opponent_idx = 1 - player_idx
         start, end, hits_blot = sub_move.start, sub_move.end, sub_move.hits_blot
+
+        # Assign player_positions for the current player
+        player_positions = positions_0 if player_idx == 0 else positions_1
+        opponent_positions = positions_0 if opponent_idx == 0 else positions_1
 
         # Remove checker from start
         if start == Position.BAR:
@@ -135,7 +138,6 @@ class ImmutableBoard:
             bar[player_idx] -= 1
             logger.debug("Removed 1 checker from Player %d's bar.", player_idx + 1)
         else:
-            player_positions = positions_0 if player_idx == 0 else positions_1
             if player_positions[start.value] <= 0:
                 logger.warning(
                     "No checker to remove at point %s for Player %d.",
@@ -152,7 +154,6 @@ class ImmutableBoard:
 
         # Handle hitting a blot
         if hits_blot:
-            opponent_positions = positions_0 if opponent_idx == 0 else positions_1
             if opponent_positions[end.value] == 1:
                 opponent_positions[end.value] -= 1
                 bar[opponent_idx] += 1
@@ -191,15 +192,3 @@ class ImmutableBoard:
             borne_off=tuple(borne_off),
             device=self.device,
         )
-
-
-# 4. Enhancing Episode Grouping for Clarity and Efficiency
-
-# To improve clarity and ensure efficient processing, you might consider explicitly grouping experiences by episodes. Here’s how you can modify your implementation:
-# a. Modify Memory Structure to Store Episodes Separately
-# Instead of using a flat list, use a list of episodes, where each episode is a list of experiences.
-# c. Adjust the Agent's Update Method to Handle Grouped Episodes
-# d. Benefits of Explicit Episode Grouping
-# Clarity: Clearly delineates where one episode ends and another begins, simplifying debugging and analysis.
-# Flexible Processing: Facilitates more nuanced processing of episodes, such as applying episode-specific transformations or analysis.
-# Enhanced Credit Assignment: Makes it easier to compute returns and advantages on a per-episode basis, ensuring accurate credit assignment even in sparse reward settings.
