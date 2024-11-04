@@ -88,18 +88,34 @@ class Worker:
                     logits = logits.squeeze(0)
                     state_value = state_value.squeeze(0)
 
-                    # Properly mask invalid actions
-                    masked_logits = logits.clone()
-                    masked_logits[action_mask == 0] = -float("inf")
+                # Properly mask invalid actions
+                masked_logits = logits.clone()
+                masked_logits[action_mask == 0] = -float("inf")
 
-                    # Compute probabilities
-                    action_probs = F.softmax(masked_logits, dim=-1)
+                # Compute probabilities
+                action_probs = F.softmax(masked_logits, dim=-1)
 
-                    # Sample action
-                    m = Categorical(action_probs)
-                    action = m.sample()
-                    action_log_prob = m.log_prob(action)
-                    # print(f"Worker {self.worker_id}: Selected action {action.item()}")
+                # Get indices of legal actions
+                legal_action_indices = torch.nonzero(action_mask).squeeze(-1)
+
+                # Get legal next observations (board features)
+                legal_board_features = env.legal_board_features.to(self.device)
+                num_legal_moves = len(legal_moves)
+                legal_board_features = legal_board_features[:num_legal_moves]
+
+                # Pass legal next observations through policy network to get their state values
+                with torch.no_grad():
+                    _, next_state_values = self.policy_network(legal_board_features)
+                    # next_state_values is of shape (num_legal_moves,)
+
+                # Select the action that leads to the next state with the highest state value
+                best_legal_action_idx = torch.argmax(next_state_values)
+
+                # Get the corresponding action index in the action space
+                action = legal_action_indices[best_legal_action_idx]
+
+                # Get the action_log_prob of the selected action
+                action_log_prob = torch.log(action_probs[action])
 
                 # Take action in env
                 next_observation, reward, done, info = env.step(action.item())

@@ -107,7 +107,7 @@ class BackgammonEnv(gym.Env):
             self.roll_dice()
 
         # Update legal moves and board features based on the first non-doubles roll
-        self.update_legal_moves()
+        self.update_legal_moves_no_padding()
 
         observation = self.get_observation()
         return observation
@@ -128,7 +128,7 @@ class BackgammonEnv(gym.Env):
             # Pass the turn
             self.pass_turn()
             self.roll_dice()
-            self.update_legal_moves()
+            self.update_legal_moves_no_padding()
 
             # Get the new observation after passing the turn
             observation = self.get_observation()
@@ -186,7 +186,7 @@ class BackgammonEnv(gym.Env):
             # Pass the turn to the other player
             self.pass_turn()
             self.roll_dice()
-            self.update_legal_moves()
+            self.update_legal_moves_no_padding()
 
         observation = self.get_observation()
         return observation, reward, done, info
@@ -195,6 +195,34 @@ class BackgammonEnv(gym.Env):
         # Board features
         board_features = self.board.get_board_features(self.current_player)
         return board_features.to(self.device)  # Ensure tensor is on the correct device
+
+    def update_legal_moves_no_padding(self):
+        # Generate legal moves
+        self.legal_moves = self.profile_call(
+            get_all_possible_moves,
+            player=self.current_player,
+            board=self.board,
+            roll_result=self.roll_result,
+        )
+
+        # Generate legal board features
+        if self.legal_moves:
+            self.legal_board_features = self.profile_call(
+                generate_all_board_features,
+                board=self.board,
+                current_player=self.current_player,
+                legal_moves=self.legal_moves,
+            )
+        else:
+            self.legal_board_features = torch.empty(
+                (0, 198), dtype=torch.float32, device=self.device
+            )
+
+        # Update action_mask (no need to pad)
+        num_moves = self.legal_board_features.size(0)
+        self.action_mask = torch.ones(
+            num_moves, dtype=torch.float32, device=self.device
+        )
 
     def update_legal_moves(self):
         # Generate legal moves
@@ -218,17 +246,10 @@ class BackgammonEnv(gym.Env):
                     current_player=self.current_player,
                     legal_moves=self.legal_moves,
                 )
-                # print(f"Worker {self.worker_id}: Generated legal board features")
             else:
                 self.legal_board_features = torch.empty(
                     (0, 198), dtype=torch.float32, device=self.device
                 )
-                # print(
-                #     f"Worker {self.worker_id}: No legal moves, generated empty board features"
-                # )
-            # print(
-            #     f"Worker {self.worker_id}: Legal board features shape: {self.legal_board_features.shape}"
-            # )
         except Exception as e:
             print(f"Worker {self.worker_id}: Error in generate_all_board_features: {e}")
             return
@@ -236,7 +257,6 @@ class BackgammonEnv(gym.Env):
         # Truncate legal moves and board features if they exceed max_legal_moves
         num_moves = self.legal_board_features.size(0)
         if num_moves > self.max_legal_moves:
-            # print(f"Worker {self.worker_id}: Truncating legal moves and board features")
             self.legal_board_features = self.legal_board_features[
                 : self.max_legal_moves, :
             ]
