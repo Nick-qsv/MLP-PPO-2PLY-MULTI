@@ -12,34 +12,20 @@ class ParameterManager:
     """
     Manages shared parameters and versioning for synchronization between the trainer and workers.
 
-    This class uses a multiprocessing.Manager() to store a shared state_dict of the model parameters
-    and a version number. It ensures thread-safe updates and provides methods for workers to access
+    This class uses shared objects (lock, parameters, version) created by a multiprocessing.Manager()
+    in the main process. It ensures thread-safe updates and provides methods for workers to access
     the latest parameters and save/load the model.
 
     Args:
-        policy_network_class (nn.Module): The class of the policy network whose parameters are managed.
-
-    Attributes:
-        parameters (multiprocessing.managers.DictProxy): A proxy dictionary storing the model parameters.
-        version (multiprocessing.managers.ValueProxy): A proxy integer representing the version number.
-        lock (multiprocessing.managers.AcquirerProxy): A lock to ensure thread-safe updates.
+        lock (multiprocessing.Lock): A lock to ensure thread-safe updates.
+        version (multiprocessing.Value): A shared integer representing the version number.
+        parameters (multiprocessing.Manager.dict): A shared dictionary storing the model parameters.
     """
 
-    def __init__(self, policy_network_class=BackgammonPolicyNetwork):
-        self.manager = multiprocessing.Manager()
-        self.lock = self.manager.Lock()
-
-        # Initialize the version number to 1
-        self.version = self.manager.Value("i", 1)
-
-        # Initialize the policy network and get its state_dict
-        initial_network = policy_network_class()
-        state_dict = initial_network.state_dict()
-
-        # Convert tensors to NumPy arrays for serialization
-        self.parameters = self.manager.dict()
-        for key, tensor in state_dict.items():
-            self.parameters[key] = tensor.cpu().numpy()
+    def __init__(self, lock, version, parameters):
+        self.lock = lock
+        self.version = version
+        self.parameters = parameters
 
         # Remove s3_client from the constructor
         self.s3_bucket_name = S3_BUCKET_NAME

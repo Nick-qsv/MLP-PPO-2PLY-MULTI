@@ -1,6 +1,6 @@
 import multiprocessing
 from multi import ParameterManager, Worker, ExperienceQueue, worker_function
-from agents import Trainer
+from agents import Trainer, BackgammonPolicyNetwork
 from utils import RingReplayBuffer
 from config import *
 import time
@@ -63,10 +63,27 @@ def main():
     pynvml.nvmlInit()
     # Initialize multiprocessing manager
     manager = multiprocessing.Manager()
-    # Initialize parameter manager, ring replay buffer, and experience queue
-    parameter_manager = ParameterManager()
+
+    # Create shared objects using the manager
+    lock = manager.Lock()
+    version = manager.Value("i", 1)
+    parameters = manager.dict()
+
+    # Initialize the policy network and get its state_dict
+    initial_network = BackgammonPolicyNetwork()
+    state_dict = initial_network.state_dict()
+
+    # Convert tensors to NumPy arrays for serialization
+    for key, tensor in state_dict.items():
+        parameters[key] = tensor.cpu().numpy()
+
+    # Initialize parameter manager with shared objects
+    parameter_manager = ParameterManager(lock, version, parameters)
+
+    # Initialize ring replay buffer and experience queue
     replay_buffer = RingReplayBuffer(max_size=10000)
     experience_queue = ExperienceQueue(manager)
+
     # Create and start worker processes
     worker_processes = []
     for i in range(7):
