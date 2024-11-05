@@ -48,7 +48,9 @@ class BackgammonEnv(gym.Env):
         self.current_player = Player.PLAYER1
         self.game_over = False
         self.match_over = False
-
+        self.current_board_features = self.board.get_board_features(
+            self.current_player
+        ).to(self.device)
         self.max_legal_moves = max_legal_moves
 
         # Observation space
@@ -65,10 +67,15 @@ class BackgammonEnv(gym.Env):
 
         # Variables for dice roll and legal moves
         self.roll_result = None
+        # Preallocate tensors for action mask and legal board features
         self.action_mask = torch.zeros(
             self.max_legal_moves, dtype=torch.float32, device=self.device
         )
-        self.legal_board_features = None  # Tensor of possible next board features
+        self.legal_board_features = torch.zeros(
+            (self.max_legal_moves, board_feature_length),
+            dtype=torch.float32,
+            device=self.device,
+        )
         self.legal_moves = []  # List of FullMove objects
 
         self.worker_id = worker_id
@@ -81,12 +88,12 @@ class BackgammonEnv(gym.Env):
             self.match_over = False
             self.current_match_winner = None
 
-        # Reset the board
-        self.board = ImmutableBoard.initial_board()
+        # Reset the board using setter method
+        self.set_board(ImmutableBoard.initial_board())
         self.game_over = False
 
-        # Alternate starting player
-        self.current_player = (
+        # Alternate starting player using setter method
+        self.set_current_player(
             Player.PLAYER1 if self.current_player == Player.PLAYER2 else Player.PLAYER2
         )
 
@@ -97,9 +104,9 @@ class BackgammonEnv(gym.Env):
 
         # The player with the higher roll starts
         if self.roll_result[0] < self.roll_result[1]:
-            self.current_player = Player.PLAYER2
+            self.set_current_player(Player.PLAYER2)
         else:
-            self.current_player = Player.PLAYER1
+            self.set_current_player(Player.PLAYER1)
 
         # Roll dice for the first move, ensuring it's not doubles
         self.roll_dice()
@@ -113,6 +120,81 @@ class BackgammonEnv(gym.Env):
         return observation
 
     def step(self, action):
+        # Initialize the info dictionary with current_player
+        info = {"current_player": self.current_player}
+
+        if self.game_over:
+            observation = self.profile_call(self.get_observation)
+            return observation, torch.tensor(0.0, device=self.device), True, info
+
+        # Check if there are any legal actions
+        if self.action_mask.sum() == 0:
+            reward = torch.tensor(REWARD_PASS, device=self.device)
+            done = False
+            self.profile_call(self.pass_turn)
+            self.profile_call(self.roll_dice)
+            self.profile_call(self.update_legal_moves)
+            observation = self.profile_call(self.get_observation)
+            return (
+                observation,
+                reward,
+                done,
+                {**info, "info": "No legal actions, turn passed"},
+            )
+
+        if not self.action_mask[action]:
+            reward = torch.tensor(REWARD_INVALID_ACTION, device=self.device)
+            done = False
+            observation = self.profile_call(self.get_observation)
+            return observation, reward, done, {**info, "info": "Invalid action"}
+
+        selected_move = self.legal_moves[action]
+        # Update the board using setter method
+        self.set_board(
+            self.profile_call(
+                execute_full_move_on_board_copy, self.board, selected_move
+            )
+        )
+
+        if self.profile_call(check_game_over, self.board, self.current_player):
+            is_backgammon = self.profile_call(
+                check_for_backgammon, self.board, self.current_player
+            )
+            is_gammon = False
+            if not is_backgammon:
+                is_gammon = self.profile_call(
+                    check_for_gammon, self.board, self.current_player
+                )
+
+            if is_backgammon:
+                game_score = 3
+                reward = torch.tensor(REWARD_WIN_BACKGAMMON, device=self.device)
+            elif is_gammon:
+                game_score = 2
+                reward = torch.tensor(REWARD_WIN_GAMMON, device=self.device)
+            else:
+                game_score = 1
+                reward = torch.tensor(REWARD_WIN_NORMAL, device=self.device)
+
+            info.update({"winner": self.current_player, "game_score": game_score})
+            self.player_scores[self.current_player] += game_score
+            self.game_over = True
+            done = True
+
+            if self.player_scores[self.current_player] >= self.match_length:
+                self.current_match_winner = self.current_player
+                self.match_over = True
+        else:
+            reward = torch.tensor(0.0, device=self.device)
+            done = False
+            self.profile_call(self.pass_turn)
+            self.profile_call(self.roll_dice)
+            self.profile_call(self.update_legal_moves)
+
+        observation = self.profile_call(self.get_observation)
+        return observation, reward, done, info
+
+    def step_old(self, action):
         # Initialize the info dictionary with current_player
         info = {"current_player": self.current_player}
 
@@ -191,11 +273,6 @@ class BackgammonEnv(gym.Env):
         observation = self.get_observation()
         return observation, reward, done, info
 
-    def get_observation(self):
-        # Board features
-        board_features = self.board.get_board_features(self.current_player)
-        return board_features.to(self.device)  # Ensure tensor is on the correct device
-
     def update_legal_moves(self):
         # Generate legal moves
         try:
@@ -209,69 +286,81 @@ class BackgammonEnv(gym.Env):
             print(f"Worker {self.worker_id}: Error in get_all_possible_moves: {e}")
             return
 
-        # Generate legal board features for the action mask
+        # Generate legal board features
         try:
             if self.legal_moves:
-                self.legal_board_features = self.profile_call(
+                legal_board_features = self.profile_call(
                     generate_all_board_features,
                     board=self.board,
                     current_player=self.current_player,
                     legal_moves=self.legal_moves,
                 )
             else:
-                self.legal_board_features = torch.empty(
-                    (0, 198), dtype=torch.float32, device=self.device
+                legal_board_features = torch.empty(
+                    (0, self.board_feature_length),
+                    dtype=torch.float32,
+                    device=self.device,
                 )
         except Exception as e:
             print(f"Worker {self.worker_id}: Error in generate_all_board_features: {e}")
             return
 
         # Truncate legal moves and board features if they exceed max_legal_moves
-        num_moves = self.legal_board_features.size(0)
+        num_moves = legal_board_features.size(0)
         if num_moves > self.max_legal_moves:
-            self.legal_board_features = self.legal_board_features[
-                : self.max_legal_moves, :
-            ]
+            legal_board_features = legal_board_features[: self.max_legal_moves]
             self.legal_moves = self.legal_moves[: self.max_legal_moves]
+            num_moves = self.max_legal_moves
+        else:
+            self.legal_moves = self.legal_moves[:num_moves]
+
         # print(
         #     f"Worker {self.worker_id}: Final number of legal moves: {len(self.legal_moves)}"
         # )
 
         # Update action_mask
         try:
-            # print(f"Worker {self.worker_id}: self.device = {self.device}")
-            self.action_mask = torch.zeros(
-                self.max_legal_moves, dtype=torch.float32, device=self.device
-            )
-            self.action_mask[:num_moves] = 1.0
-            # print(f"Worker {self.worker_id}: Action mask updated")
+            self.action_mask.zero_()
+            if num_moves > 0:
+                self.action_mask[:num_moves].fill_(1.0)
         except Exception as e:
             print(f"Worker {self.worker_id}: Error updating action_mask: {e}")
             return
 
-        # If fewer moves than max_legal_moves, pad the features
+        # Update legal_board_features
         try:
+            if num_moves > 0:
+                self.legal_board_features[:num_moves].copy_(legal_board_features)
             if num_moves < self.max_legal_moves:
-                padding_length = self.max_legal_moves - num_moves
-
-                padding = torch.zeros(
-                    (padding_length, self.legal_board_features.size(1)),
-                    dtype=self.legal_board_features.dtype,
-                    device=self.device,
-                )
-
-                self.legal_board_features = torch.cat(
-                    [self.legal_board_features, padding], dim=0
-                )
+                self.legal_board_features[num_moves:].zero_()
         except Exception as e:
-            print(f"Worker {self.worker_id}: Error during padding: {e}")
+            print(f"Worker {self.worker_id}: Error updating legal_board_features: {e}")
             return
 
     def roll_dice(self):
         self.roll_result = [np.random.randint(1, 7), np.random.randint(1, 7)]
 
+    def get_observation(self):
+        # Return the cached board features
+        return self.current_board_features
+
+    def set_board(self, new_board):
+        self.board = new_board
+        # Update cached board features
+        self.current_board_features = self.board.get_board_features(
+            self.current_player
+        ).to(self.device)
+
+    def set_current_player(self, new_player):
+        self.current_player = new_player
+        # Update cached board features
+        self.current_board_features = self.board.get_board_features(
+            self.current_player
+        ).to(self.device)
+
     def pass_turn(self):
-        self.current_player = get_opponent(self.current_player)
+        # Use setter method to update current player
+        self.set_current_player(get_opponent(self.current_player))
 
     def profile_call(self, func, *args, **kwargs):
         start_time = time.perf_counter()
