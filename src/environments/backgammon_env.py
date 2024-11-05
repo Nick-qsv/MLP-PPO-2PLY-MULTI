@@ -61,6 +61,7 @@ class BackgammonEnv(gym.Env):
             shape=(board_feature_length,),
             dtype=np.float32,
         )
+        self.board_feature_length = board_feature_length  # Save for later use
 
         # Action space
         self.action_space = spaces.Discrete(self.max_legal_moves)
@@ -124,17 +125,17 @@ class BackgammonEnv(gym.Env):
         info = {"current_player": self.current_player}
 
         if self.game_over:
-            observation = self.profile_call(self.get_observation)
+            observation = self.get_observation()
             return observation, torch.tensor(0.0, device=self.device), True, info
 
         # Check if there are any legal actions
         if self.action_mask.sum() == 0:
             reward = torch.tensor(REWARD_PASS, device=self.device)
             done = False
-            self.profile_call(self.pass_turn)
-            self.profile_call(self.roll_dice)
+            self.pass_turn()
+            self.roll_dice()
             self.profile_call(self.update_legal_moves)
-            observation = self.profile_call(self.get_observation)
+            observation = self.get_observation()
             return (
                 observation,
                 reward,
@@ -142,101 +143,17 @@ class BackgammonEnv(gym.Env):
                 {**info, "info": "No legal actions, turn passed"},
             )
 
-        if not self.action_mask[action]:
+        if not self.action_mask[action].item():
             reward = torch.tensor(REWARD_INVALID_ACTION, device=self.device)
             done = False
-            observation = self.profile_call(self.get_observation)
+            observation = self.get_observation()
             return observation, reward, done, {**info, "info": "Invalid action"}
 
         selected_move = self.legal_moves[action]
         # Update the board using setter method
-        self.set_board(
-            self.profile_call(
-                execute_full_move_on_board_copy, self.board, selected_move
-            )
-        )
+        self.set_board(execute_full_move_on_board_copy(self.board, selected_move))
 
-        if self.profile_call(check_game_over, self.board, self.current_player):
-            is_backgammon = self.profile_call(
-                check_for_backgammon, self.board, self.current_player
-            )
-            is_gammon = False
-            if not is_backgammon:
-                is_gammon = self.profile_call(
-                    check_for_gammon, self.board, self.current_player
-                )
-
-            if is_backgammon:
-                game_score = 3
-                reward = torch.tensor(REWARD_WIN_BACKGAMMON, device=self.device)
-            elif is_gammon:
-                game_score = 2
-                reward = torch.tensor(REWARD_WIN_GAMMON, device=self.device)
-            else:
-                game_score = 1
-                reward = torch.tensor(REWARD_WIN_NORMAL, device=self.device)
-
-            info.update({"winner": self.current_player, "game_score": game_score})
-            self.player_scores[self.current_player] += game_score
-            self.game_over = True
-            done = True
-
-            if self.player_scores[self.current_player] >= self.match_length:
-                self.current_match_winner = self.current_player
-                self.match_over = True
-        else:
-            reward = torch.tensor(0.0, device=self.device)
-            done = False
-            self.profile_call(self.pass_turn)
-            self.profile_call(self.roll_dice)
-            self.profile_call(self.update_legal_moves)
-
-        observation = self.profile_call(self.get_observation)
-        return observation, reward, done, info
-
-    def step_old(self, action):
-        # Initialize the info dictionary with current_player
-        info = {"current_player": self.current_player}
-
-        if self.game_over:
-            observation = self.get_observation()
-            return observation, torch.tensor(0.0, device=self.device), True, info
-
-        # Check if there are any legal actions
-        if self.action_mask.sum() == 0:
-            # No legal actions, pass the turn to the next player
-            reward = torch.tensor(REWARD_PASS, device=self.device)
-            done = False
-            # Pass the turn
-            self.pass_turn()
-            self.roll_dice()
-            self.update_legal_moves()
-
-            # Get the new observation after passing the turn
-            observation = self.get_observation()
-            return (
-                observation,
-                reward,
-                done,
-                {**info, "info": "No legal actions, turn passed"},
-            )
-
-        # Validate action
-        if not self.action_mask[action]:
-            # Invalid action selected
-            reward = torch.tensor(REWARD_INVALID_ACTION, device=self.device)
-            done = False
-            print(f"Invalid action selected: {action}. Assigned reward: {reward}")
-            observation = self.get_observation()
-            return observation, reward, done, {**info, "info": "Invalid action"}
-
-        # Execute the Selected Move by applying the corresponding FullMove
-        selected_move = self.legal_moves[action]
-        self.board = execute_full_move_on_board_copy(self.board, selected_move)
-
-        # Check for game over
         if check_game_over(self.board, self.current_player):
-            # Winning conditions
             is_backgammon = check_for_backgammon(self.board, self.current_player)
             is_gammon = False
             if not is_backgammon:
@@ -257,18 +174,15 @@ class BackgammonEnv(gym.Env):
             self.game_over = True
             done = True
 
-            # Check if match is over
             if self.player_scores[self.current_player] >= self.match_length:
-                # Match is over
                 self.current_match_winner = self.current_player
                 self.match_over = True
         else:
             reward = torch.tensor(0.0, device=self.device)
             done = False
-            # Pass the turn to the other player
             self.pass_turn()
             self.roll_dice()
-            self.update_legal_moves()
+            self.profile_call(self.update_legal_moves)
 
         observation = self.get_observation()
         return observation, reward, done, info
