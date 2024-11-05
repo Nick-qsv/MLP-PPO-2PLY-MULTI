@@ -1,4 +1,4 @@
-from backgammon.types.moves import Player, FullMove
+from backgammon.types.moves import Player, FullMove, Position
 from backgammon.board.immutable_board import ImmutableBoard
 import torch
 from typing import List
@@ -25,6 +25,73 @@ def generate_all_board_features(
 
 
 def execute_full_move_on_board_copy(
+    board: ImmutableBoard, full_move: FullMove
+) -> ImmutableBoard:
+    player = full_move.player
+    # opponent = Player(1 - player)
+
+    if player == Player.PLAYER1:
+        positions_player = board.positions_0
+        positions_opponent = board.positions_1
+        bar_player = board.bar[Player.PLAYER1]
+        bar_opponent = board.bar[Player.PLAYER2]
+        borne_off_player = board.borne_off[Player.PLAYER1]
+        borne_off_opponent = board.borne_off[Player.PLAYER2]
+    else:
+        positions_player = board.positions_1
+        positions_opponent = board.positions_0
+        bar_player = board.bar[Player.PLAYER2]
+        bar_opponent = board.bar[Player.PLAYER1]
+        borne_off_player = board.borne_off[Player.PLAYER2]
+        borne_off_opponent = board.borne_off[Player.PLAYER1]
+
+    positions_player_list = list(positions_player)
+    positions_opponent_list = list(positions_opponent)
+
+    for submove in full_move.sub_move_commands:
+        start = submove.start
+        end = submove.end
+        hits_blot = submove.hits_blot
+
+        # Update start position
+        if start == Position.BAR:
+            bar_player -= 1
+        else:
+            positions_player_list[start] -= 1
+
+        # Handle hitting opponent's blot
+        if hits_blot:
+            positions_opponent_list[end] -= 1
+            bar_opponent += 1
+
+        # Update end position
+        if end == Position.BEAR_OFF:
+            borne_off_player += 1
+        else:
+            positions_player_list[end] += 1
+
+    # Prepare new positions and counts
+    if player == Player.PLAYER1:
+        new_positions_0 = tuple(positions_player_list)
+        new_positions_1 = tuple(positions_opponent_list)
+        new_bar = (bar_player, bar_opponent)
+        new_borne_off = (borne_off_player, borne_off_opponent)
+    else:
+        new_positions_0 = tuple(positions_opponent_list)
+        new_positions_1 = tuple(positions_player_list)
+        new_bar = (bar_opponent, bar_player)
+        new_borne_off = (borne_off_opponent, borne_off_player)
+
+    return ImmutableBoard(
+        positions_0=new_positions_0,
+        positions_1=new_positions_1,
+        bar=new_bar,
+        borne_off=new_borne_off,
+        device=board.device,
+    )
+
+
+def execute_full_move_on_board_copy_old(
     board: ImmutableBoard, full_move: FullMove
 ) -> ImmutableBoard:
     """

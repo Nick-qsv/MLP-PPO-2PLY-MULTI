@@ -69,6 +69,50 @@ class ImmutableBoard:
         Returns:
             torch.Tensor: A tensor of shape (198,) representing the board features.
         """
+        # Preallocate the feature tensor
+        features = torch.zeros(198, dtype=torch.float32, device=self.device)
+
+        # Combine positions of both players into a single tensor of shape (2, 24)
+        positions = torch.tensor(
+            [self.positions_0, self.positions_1], dtype=torch.int8, device=self.device
+        )  # Shape: (2, 24)
+
+        # Compute features:
+        # - Presence of at least 1, 2, 3 checkers
+        # - Number of checkers beyond 3, clamped and scaled
+        presence_1 = (positions >= 1).float()  # Shape: (2, 24)
+        presence_2 = (positions >= 2).float()  # Shape: (2, 24)
+        presence_3 = (positions >= 3).float()  # Shape: (2, 24)
+        excess = torch.clamp(positions - 3, min=0).float() / 2.0  # Shape: (2, 24)
+
+        # Stack all features along a new dimension and reshape
+        feature_stack = torch.stack(
+            [presence_1, presence_2, presence_3, excess], dim=2
+        )  # Shape: (2, 24, 4)
+        features[:192] = feature_stack.view(-1)  # Flatten to (192,)
+
+        # Assign bar and borne off features for both players
+        # Player 1
+        features[192] = self.bar[Player.PLAYER1] / 2.0
+        features[193] = self.borne_off[Player.PLAYER1] / 15.0
+        # Player 2
+        features[194] = self.bar[Player.PLAYER2] / 2.0
+        features[195] = self.borne_off[Player.PLAYER2] / 15.0
+
+        # Assign current player indicator features
+        is_player1 = current_player == Player.PLAYER1
+        is_player2 = current_player == Player.PLAYER2
+        features[196] = 1.0 if is_player1 else 0.0
+        features[197] = 1.0 if is_player2 else 0.0
+
+        return features
+
+    def get_board_features_old(self, current_player: Player) -> torch.Tensor:
+        """
+        Computes the 198-dimensional feature vector for the board state.
+        Returns:
+            torch.Tensor: A tensor of shape (198,) representing the board features.
+        """
         features = torch.zeros(198, dtype=torch.float32, device=self.device)
         feature_index = 0
 
