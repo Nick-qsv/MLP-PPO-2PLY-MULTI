@@ -129,7 +129,7 @@ class Trainer:
         actions = torch.tensor(actions).to(self.device)
         action_log_probs = torch.stack(action_log_probs).to(self.device)
         rewards = torch.tensor(rewards).to(self.device)
-        dones = torch.tensor(dones, dtype=torch.float16).to(self.device)
+        dones = torch.tensor(dones, dtype=torch.float32).to(self.device)
         state_values = torch.stack(state_values).to(self.device)
         next_state_values = torch.stack(next_state_values).to(self.device)
         action_masks = torch.stack(action_masks).to(self.device)

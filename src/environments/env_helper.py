@@ -13,7 +13,7 @@ def generate_all_board_features(
     Generates a tensor of all possible board features based on legal moves.
     """
     N = len(legal_moves)
-    features = torch.zeros(N, 198, dtype=torch.float16, device=board.device)
+    features = torch.zeros(N, 198, dtype=torch.float32, device=board.device)
     for i, full_move in enumerate(legal_moves):
         # Apply the full move to a copy of the board
         new_board = execute_full_move_on_board_copy(board, full_move)
