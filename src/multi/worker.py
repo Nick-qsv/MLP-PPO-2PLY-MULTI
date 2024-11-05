@@ -85,7 +85,7 @@ class Worker:
 
                 with torch.no_grad():
                     logits, state_value = self.policy_network(observation_tensor)
-                    logits = logits.squeeze(0)
+                    logits = logits.squeeze(0)  # Shape: (action_size,)
                     state_value = state_value.squeeze(0)
 
                 # Properly mask invalid actions
@@ -99,14 +99,17 @@ class Worker:
                 legal_action_indices = torch.nonzero(action_mask).squeeze(-1)
 
                 # Get legal next observations (board features)
-                legal_board_features = env.legal_board_features.to(self.device)
                 num_legal_moves = len(legal_moves)
-                legal_board_features = legal_board_features[:num_legal_moves]
+                legal_board_features = env.legal_board_features[:num_legal_moves].to(
+                    self.device
+                )
 
                 # Pass legal next observations through policy network to get their state values
                 with torch.no_grad():
                     _, next_state_values = self.policy_network(legal_board_features)
-                    # next_state_values is of shape (num_legal_moves,)
+                    next_state_values = next_state_values.squeeze(
+                        -1
+                    )  # Shape: (num_legal_moves,)
 
                 # Select the action that leads to the next state with the highest state value
                 best_legal_action_idx = torch.argmax(next_state_values)
