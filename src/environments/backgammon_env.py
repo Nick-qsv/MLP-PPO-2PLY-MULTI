@@ -48,9 +48,7 @@ class BackgammonEnv(gym.Env):
         self.current_player = Player.PLAYER1
         self.game_over = False
         self.match_over = False
-        self.current_board_features = self.board.get_board_features(
-            self.current_player
-        ).to(self.device)
+        self.current_board_features = self.board.get_board_features(self.current_player)
         self.max_legal_moves = max_legal_moves
 
         # Observation space
@@ -218,7 +216,7 @@ class BackgammonEnv(gym.Env):
             return
 
         # Refactored: Truncate legal moves and board features
-        self.truncate_legal_moves_and_features, legal_board_features
+        self.truncate_legal_moves_and_features(legal_board_features)
 
         # Refactored: Update action_mask
         self.update_action_mask()
@@ -275,16 +273,12 @@ class BackgammonEnv(gym.Env):
     def set_board(self, new_board):
         self.board = new_board
         # Update cached board features
-        self.current_board_features = self.board.get_board_features(
-            self.current_player
-        ).to(self.device)
+        self.current_board_features = self.board.get_board_features(self.current_player)
 
     def set_current_player(self, new_player):
         self.current_player = new_player
         # Update cached board features
-        self.current_board_features = self.board.get_board_features(
-            self.current_player
-        ).to(self.device)
+        self.current_board_features = self.board.get_board_features(self.current_player)
 
     def pass_turn(self):
         # Use setter method to update current player

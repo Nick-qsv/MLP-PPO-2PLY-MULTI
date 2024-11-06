@@ -62,117 +62,6 @@ class Worker:
                     f"Worker {self.worker_id}: Updated parameters to version {self.current_version}"
                 )
 
-    def play_episode_old(self, env, max_steps=MAX_TIMESTEPS):
-        episode = Episode()
-        observation = env.reset()
-
-        done = False
-        step_count = 0
-
-        while not done and step_count < max_steps:
-            action_mask = env.action_mask.clone()
-            legal_moves = env.legal_moves
-
-            if not legal_moves:
-                # No legal moves, pass turn (handled in env)
-                action = None
-                action_log_prob = None
-                state_value = None
-                next_observation, reward, done, info = env.step(action)
-                next_state_value = None
-            else:
-                # Use PolicyNetwork to select action
-                observation_tensor = observation.unsqueeze(0).to(self.device)
-
-                with torch.no_grad():
-                    logits, state_value = self.policy_network(observation_tensor)
-                    logits = logits.squeeze(0)  # Shape: (action_size,)
-                    state_value = state_value.squeeze(0)
-
-                # Properly mask invalid actions
-                masked_logits = logits.clone()
-                masked_logits[action_mask == 0] = -float("inf")
-
-                # Compute probabilities
-                action_probs = F.softmax(masked_logits, dim=-1)
-
-                # Get indices of legal actions
-                legal_action_indices = torch.nonzero(action_mask).squeeze(-1)
-
-                # Get legal next observations (board features)
-                num_legal_moves = len(legal_moves)
-                legal_board_features = env.legal_board_features[:num_legal_moves].to(
-                    self.device
-                )
-
-                # Pass legal next observations through policy network to get their state values
-                with torch.no_grad():
-                    _, next_state_values = self.policy_network(legal_board_features)
-                    next_state_values = next_state_values.squeeze(
-                        -1
-                    )  # Shape: (num_legal_moves,)
-
-                # Select the action that leads to the next state with the highest state value
-                best_legal_action_idx = torch.argmax(next_state_values)
-
-                # Get the corresponding action index in the action space
-                action = legal_action_indices[best_legal_action_idx]
-
-                # Get the action_log_prob of the selected action
-                action_log_prob = torch.log(action_probs[action])
-
-                # Take action in env
-                next_observation, reward, done, info = env.step(action.item())
-
-                # Get next state value
-                with torch.no_grad():
-                    next_observation_tensor = next_observation.unsqueeze(0).to(
-                        self.device
-                    )
-                    _, next_state_value = self.policy_network(next_observation_tensor)
-                    next_state_value = next_state_value.squeeze(0)
-
-            # Create Experience
-            experience = Experience(
-                observation=observation,
-                action_mask=action_mask,
-                action=action,
-                action_log_prob=action_log_prob,
-                state_value=state_value,
-                reward=reward,
-                done=done,
-                next_observation=next_observation,
-                next_state_value=next_state_value,
-            )
-
-            # Add experience to episode
-            episode.add_experience(experience)
-
-            # Move to next observation
-            observation = next_observation
-            step_count += 1
-
-        if step_count >= max_steps:
-            print(f"Worker {self.worker_id}: Reached maximum steps in episode.")
-
-        # Convert tensors to NumPy arrays before returning the episode
-        episode.to_numpy()
-
-        # Print profiling data
-        print(f"Worker {self.worker_id} profiling data for this episode:")
-        for func_name, data in env.profiling_data.items():
-            total_time = data["total_time"]
-            call_count = data["call_count"]
-            avg_time = total_time / call_count if call_count else 0
-            print(
-                f"{func_name}: Total Time = {total_time:.6f}s, Calls = {call_count}, Average Time = {avg_time:.6f}s"
-            )
-
-        # Reset profiling data for the next episode
-        env.profiling_data = {}
-
-        return episode
-
     def play_episode(self, env, max_steps=MAX_TIMESTEPS):
         episode = Episode()
         observation = env.reset()
@@ -209,13 +98,13 @@ class Worker:
                 action = None
                 action_log_prob = None
                 state_value = None
-                next_observation, reward, done, info = env.step(action)
                 next_state_value = None
+                next_observation, reward, done, info = env.step(action)
                 end_timer("Env Step (No Action)")
             else:
                 # Use PolicyNetwork to select action
                 start_timer("Policy Network Forward Pass (Observation)")
-                observation_tensor = observation.unsqueeze(0).to(self.device)
+                observation_tensor = observation.unsqueeze(0)
 
                 with torch.no_grad():
                     logits, state_value = self.policy_network(observation_tensor)
@@ -242,9 +131,7 @@ class Worker:
                 # Get legal next observations (board features)
                 start_timer("Prepare Legal Board Features")
                 num_legal_moves = len(legal_moves)
-                legal_board_features = env.legal_board_features[:num_legal_moves].to(
-                    self.device
-                )
+                legal_board_features = env.legal_board_features[:num_legal_moves]
                 end_timer("Prepare Legal Board Features")
 
                 # Pass legal next observations through policy network to get their state values
@@ -258,30 +145,42 @@ class Worker:
 
                 # Select the action that leads to the next state with the highest state value
                 start_timer("Select Best Action")
-                best_legal_action_idx = torch.argmax(next_state_values)
-                # Get the corresponding action index in the action space
-                action = legal_action_indices[best_legal_action_idx]
+                if legal_action_indices.numel() > 0:
+                    best_legal_action_idx = torch.argmax(next_state_values)
+                    # Get the corresponding action index in the action space
+                    action = legal_action_indices[best_legal_action_idx]
+                    # Get the next_state_value corresponding to the chosen action
+                    next_state_value = next_state_values[best_legal_action_idx]
+                else:
+                    # Handle the case where no valid actions are found
+                    print(
+                        f"Worker {self.worker_id}: No valid actions found despite having legal moves."
+                    )
+                    action = None
+                    next_state_value = None
                 end_timer("Select Best Action")
 
-                # Get the action_log_prob of the selected action
-                start_timer("Compute Action Log Prob")
-                action_log_prob = torch.log(action_probs[action])
-                end_timer("Compute Action Log Prob")
+                if action is not None:
+                    # Get the action_log_prob of the selected action
+                    start_timer("Compute Action Log Prob")
+                    action_log_prob = torch.log(action_probs[action])
+                    end_timer("Compute Action Log Prob")
 
-                # Take action in env
-                start_timer("Env Step (With Action)")
-                next_observation, reward, done, info = env.step(action.item())
-                end_timer("Env Step (With Action)")
+                    # Take action in env
+                    start_timer("Env Step (With Action)")
+                    next_observation, reward, done, info = env.step(action.item())
+                    end_timer("Env Step (With Action)")
 
-                # Get next state value
-                start_timer("Policy Network Forward Pass (Next Observation)")
-                with torch.no_grad():
-                    next_observation_tensor = next_observation.unsqueeze(0).to(
-                        self.device
-                    )
-                    _, next_state_value = self.policy_network(next_observation_tensor)
-                    next_state_value = next_state_value.squeeze(0)
-                end_timer("Policy Network Forward Pass (Next Observation)")
+                    # No need for a third forward pass; next_state_value is already obtained
+                else:
+                    # Handle the scenario where no action is taken
+                    action_log_prob = None
+                    state_value = None
+                    next_state_value = None
+                    # Assuming env.step(None) handles passing the turn
+                    start_timer("Env Step (No Action)")
+                    next_observation, reward, done, info = env.step(action)
+                    end_timer("Env Step (No Action)")
 
             # Create Experience
             start_timer("Create Experience")
