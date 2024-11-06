@@ -190,8 +190,7 @@ class BackgammonEnv(gym.Env):
     def update_legal_moves(self):
         # Generate legal moves
         try:
-            self.legal_moves = self.profile_call(
-                get_all_possible_moves,
+            self.legal_moves = get_all_possible_moves(
                 player=self.current_player,
                 board=self.board,
                 roll_result=self.roll_result,
@@ -203,8 +202,7 @@ class BackgammonEnv(gym.Env):
         # Generate legal board features
         try:
             if self.legal_moves:
-                legal_board_features = self.profile_call(
-                    generate_all_board_features,
+                legal_board_features = generate_all_board_features(
                     board=self.board,
                     current_player=self.current_player,
                     legal_moves=self.legal_moves,
@@ -219,7 +217,19 @@ class BackgammonEnv(gym.Env):
             print(f"Worker {self.worker_id}: Error in generate_all_board_features: {e}")
             return
 
-        # Truncate legal moves and board features if they exceed max_legal_moves
+        # Refactored: Truncate legal moves and board features
+        self.truncate_legal_moves_and_features, legal_board_features
+
+        # Refactored: Update action_mask
+        self.update_action_mask()
+
+        # Refactored: Update legal_board_features
+        self.update_legal_board_features(legal_board_features)
+
+    def truncate_legal_moves_and_features(self, legal_board_features):
+        """
+        Truncate legal moves and board features if they exceed max_legal_moves.
+        """
         num_moves = legal_board_features.size(0)
         if num_moves > self.max_legal_moves:
             legal_board_features = legal_board_features[: self.max_legal_moves]
@@ -228,25 +238,29 @@ class BackgammonEnv(gym.Env):
         else:
             self.legal_moves = self.legal_moves[:num_moves]
 
-        # print(
-        #     f"Worker {self.worker_id}: Final number of legal moves: {len(self.legal_moves)}"
-        # )
+        # Optionally, you can return num_moves if needed
+        self.num_moves = num_moves
 
-        # Update action_mask
+    def update_action_mask(self):
+        """
+        Update the action mask tensor based on the number of legal moves.
+        """
         try:
             self.action_mask.zero_()
-            if num_moves > 0:
-                self.action_mask[:num_moves].fill_(1.0)
+            if self.num_moves > 0:
+                self.action_mask[: self.num_moves].fill_(1.0)
         except Exception as e:
             print(f"Worker {self.worker_id}: Error updating action_mask: {e}")
             return
 
-        # Update legal_board_features
+    def update_legal_board_features(self, legal_board_features):
+        """
+        Update the legal_board_features tensor with the provided features.
+        """
         try:
-            if num_moves > 0:
-                self.legal_board_features[:num_moves].copy_(legal_board_features)
-            if num_moves < self.max_legal_moves:
-                self.legal_board_features[num_moves:].zero_()
+            if self.num_moves > 0:
+                self.legal_board_features[: self.num_moves].copy_(legal_board_features)
+            # Removed the zeroing operation to improve performance
         except Exception as e:
             print(f"Worker {self.worker_id}: Error updating legal_board_features: {e}")
             return

@@ -4,6 +4,7 @@ from torch.distributions import Categorical
 from environments import Episode, Experience, BackgammonEnv
 from agents import BackgammonPolicyNetwork
 from config import USE_SIGMOID, MAX_TIMESTEPS
+import time
 
 
 class Worker:
@@ -61,7 +62,7 @@ class Worker:
                     f"Worker {self.worker_id}: Updated parameters to version {self.current_version}"
                 )
 
-    def play_episode(self, env, max_steps=MAX_TIMESTEPS):
+    def play_episode_old(self, env, max_steps=MAX_TIMESTEPS):
         episode = Episode()
         observation = env.reset()
 
@@ -169,6 +170,160 @@ class Worker:
 
         # Reset profiling data for the next episode
         env.profiling_data = {}
+
+        return episode
+
+    def play_episode(self, env, max_steps=MAX_TIMESTEPS):
+        episode = Episode()
+        observation = env.reset()
+
+        # Initialize profiling dictionary
+        profiling_data = {}
+
+        def start_timer(key):
+            profiling_data[key] = profiling_data.get(
+                key, {"total_time": 0.0, "call_count": 0}
+            )
+            profiling_data[key]["start_time"] = time.perf_counter()
+
+        def end_timer(key):
+            end_time = time.perf_counter()
+            profiling_data[key]["total_time"] += (
+                end_time - profiling_data[key]["start_time"]
+            )
+            profiling_data[key]["call_count"] += 1
+
+        done = False
+        step_count = 0
+
+        while not done and step_count < max_steps:
+            # Start profiling for environment action mask retrieval
+            start_timer("Retrieve Action Mask")
+            action_mask = env.action_mask.clone()
+            legal_moves = env.legal_moves
+            end_timer("Retrieve Action Mask")
+
+            if not legal_moves:
+                # No legal moves, pass turn (handled in env)
+                start_timer("Env Step (No Action)")
+                action = None
+                action_log_prob = None
+                state_value = None
+                next_observation, reward, done, info = env.step(action)
+                next_state_value = None
+                end_timer("Env Step (No Action)")
+            else:
+                # Use PolicyNetwork to select action
+                start_timer("Policy Network Forward Pass (Observation)")
+                observation_tensor = observation.unsqueeze(0).to(self.device)
+
+                with torch.no_grad():
+                    logits, state_value = self.policy_network(observation_tensor)
+                    logits = logits.squeeze(0)  # Shape: (action_size,)
+                    state_value = state_value.squeeze(0)
+                end_timer("Policy Network Forward Pass (Observation)")
+
+                # Properly mask invalid actions
+                start_timer("Mask Invalid Actions")
+                masked_logits = logits.clone()
+                masked_logits[action_mask == 0] = -float("inf")
+                end_timer("Mask Invalid Actions")
+
+                # Compute probabilities
+                start_timer("Compute Softmax")
+                action_probs = F.softmax(masked_logits, dim=-1)
+                end_timer("Compute Softmax")
+
+                # Get indices of legal actions
+                start_timer("Get Legal Action Indices")
+                legal_action_indices = torch.nonzero(action_mask).squeeze(-1)
+                end_timer("Get Legal Action Indices")
+
+                # Get legal next observations (board features)
+                start_timer("Prepare Legal Board Features")
+                num_legal_moves = len(legal_moves)
+                legal_board_features = env.legal_board_features[:num_legal_moves].to(
+                    self.device
+                )
+                end_timer("Prepare Legal Board Features")
+
+                # Pass legal next observations through policy network to get their state values
+                start_timer("Policy Network Forward Pass (Legal Moves)")
+                with torch.no_grad():
+                    _, next_state_values = self.policy_network(legal_board_features)
+                    next_state_values = next_state_values.squeeze(
+                        -1
+                    )  # Shape: (num_legal_moves,)
+                end_timer("Policy Network Forward Pass (Legal Moves)")
+
+                # Select the action that leads to the next state with the highest state value
+                start_timer("Select Best Action")
+                best_legal_action_idx = torch.argmax(next_state_values)
+                # Get the corresponding action index in the action space
+                action = legal_action_indices[best_legal_action_idx]
+                end_timer("Select Best Action")
+
+                # Get the action_log_prob of the selected action
+                start_timer("Compute Action Log Prob")
+                action_log_prob = torch.log(action_probs[action])
+                end_timer("Compute Action Log Prob")
+
+                # Take action in env
+                start_timer("Env Step (With Action)")
+                next_observation, reward, done, info = env.step(action.item())
+                end_timer("Env Step (With Action)")
+
+                # Get next state value
+                start_timer("Policy Network Forward Pass (Next Observation)")
+                with torch.no_grad():
+                    next_observation_tensor = next_observation.unsqueeze(0).to(
+                        self.device
+                    )
+                    _, next_state_value = self.policy_network(next_observation_tensor)
+                    next_state_value = next_state_value.squeeze(0)
+                end_timer("Policy Network Forward Pass (Next Observation)")
+
+            # Create Experience
+            start_timer("Create Experience")
+            experience = Experience(
+                observation=observation,
+                action_mask=action_mask,
+                action=action,
+                action_log_prob=action_log_prob,
+                state_value=state_value,
+                reward=reward,
+                done=done,
+                next_observation=next_observation,
+                next_state_value=next_state_value,
+            )
+            end_timer("Create Experience")
+
+            # Add experience to episode
+            start_timer("Add Experience to Episode")
+            episode.add_experience(experience)
+            end_timer("Add Experience to Episode")
+
+            # Move to next observation
+            observation = next_observation
+            step_count += 1
+
+        if step_count >= max_steps:
+            print(f"Worker {self.worker_id}: Reached maximum steps in episode.")
+
+        # Convert tensors to NumPy arrays before returning the episode
+        start_timer("Convert Episode to NumPy")
+        episode.to_numpy()
+        end_timer("Convert Episode to NumPy")
+
+        # Print profiling data
+        print(f"\nWorker {self.worker_id} profiling data for this episode:")
+        for func_name, data in profiling_data.items():
+            total_time = data["total_time"]
+            call_count = data["call_count"]
+            avg_time = total_time / call_count if call_count else 0
+            print(
+                f"{func_name}: Total Time = {total_time:.6f}s, Calls = {call_count}, Average Time = {avg_time:.6f}s"
+            )
 
         return episode
 
