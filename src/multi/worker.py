@@ -134,11 +134,11 @@ class Worker:
                 legal_board_features = env.legal_board_features[:num_legal_moves]
                 end_timer("Prepare Legal Board Features")
 
-                # Pass legal next observations through policy network to get their state values
+                # Pass legal next observations (board features) through policy network to get their state values
                 start_timer("Policy Network Forward Pass (Legal Moves)")
                 with torch.no_grad():
                     _, next_state_values = self.policy_network(legal_board_features)
-                    next_state_values = next_state_values.squeeze(
+                    next_state_values = next_state_values.view(
                         -1
                     )  # Shape: (num_legal_moves,)
                 end_timer("Policy Network Forward Pass (Legal Moves)")
