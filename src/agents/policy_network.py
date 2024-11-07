@@ -5,12 +5,11 @@ import torch
 
 class BackgammonPolicyNetwork(nn.Module):
     """
-    A Multi-Layer Perceptron (MLP) Policy Network for Backgammon.
+    A Multi-Layer Perceptron (MLP) Policy Network for Backgammon with Action Masking.
 
     This network evaluates backgammon board states and outputs a single logit
-    and a state value estimate per board state. It is designed to be integrated
-    with a Proximal Policy Optimization (PPO) agent and supports batch processing
-    for efficiency.
+    and a state value estimate per board state. It accepts an action mask to
+    skip computing logits for invalid actions in each batch.
 
     Architecture:
         - Input Layer:
@@ -37,7 +36,8 @@ class BackgammonPolicyNetwork(nn.Module):
     Example:
         >>> model = BackgammonPolicyNetwork(input_size=198, hidden_size=128)
         >>> board_features = torch.randn(32, 198)  # Batch of 32 board states
-        >>> logits, state_values = model(board_features)
+        >>> action_mask = torch.randint(0, 2, (32,))  # Random action mask
+        >>> logits, state_values = model(board_features, action_mask)
         >>> action_probs = torch.sigmoid(logits)  # Convert logits to probabilities
     """
 
@@ -62,16 +62,19 @@ class BackgammonPolicyNetwork(nn.Module):
         nn.init.xavier_uniform_(self.action_head.weight)
         nn.init.xavier_uniform_(self.value_head.weight)
 
-    def forward(self, x):
+    def forward(self, x, action_mask):
         """
         Defines the forward pass of the network.
 
         Args:
             x (torch.Tensor): Input tensor containing batch of board state features.
                               Shape: (batch_size, 198)
+            action_mask (torch.Tensor): Tensor containing action masks.
+                                        Shape: (batch_size,), elements are 1 (valid action) or 0 (invalid action)
 
         Returns:
             logits (torch.Tensor): Tensor containing a single logit per board state.
+                                   Invalid actions have logits set to -1e9.
                                    Shape: (batch_size,)
             state_values (torch.Tensor): Tensor containing state value estimates.
                                          Shape: (batch_size,)
@@ -83,4 +86,9 @@ class BackgammonPolicyNetwork(nn.Module):
 
         logits = self.action_head(x).squeeze(-1)  # Action logits
         state_values = self.value_head(x).squeeze(-1)  # State value estimates
+
+        # Adjust logits for invalid actions
+        mask = action_mask.to(dtype=torch.bool, device=logits.device)
+        logits = logits.masked_fill(~mask, -1e9)
+
         return logits, state_values
