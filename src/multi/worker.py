@@ -5,6 +5,7 @@ from environments import Episode, Experience, BackgammonEnv
 from agents import BackgammonPolicyNetwork
 from config import MAX_TIMESTEPS
 import time
+import torch.autograd.profiler as profiler
 
 
 class Worker:
@@ -136,10 +137,12 @@ class Worker:
 
             # Perform a forward pass
             start_timer("Policy Network Forward Pass (Combined States)")
-            with torch.no_grad():
-                logits, state_values = self.policy_network(
-                    combined_states, combined_action_mask
-                )
+            with profiler.profile(record_shapes=True) as prof:
+                with torch.no_grad():
+                    logits, state_values = self.policy_network(
+                        combined_states, combined_action_mask
+                    )
+            print(prof.key_averages().table(sort_by="cpu_time_total"))
             end_timer("Policy Network Forward Pass (Combined States)")
 
             # Split the outputs

@@ -29,7 +29,7 @@ class BackgammonEnv(gym.Env):
         self,
         worker_id=None,
         match_length=15,
-        max_legal_moves=500,
+        max_legal_moves=300,
         device=torch.device("cpu"),
     ):
         super(BackgammonEnv, self).__init__()
