@@ -3,7 +3,7 @@ import torch.nn.functional as F
 from torch.distributions import Categorical
 from environments import Episode, Experience, BackgammonEnv
 from agents import BackgammonPolicyNetwork
-from config import USE_SIGMOID, MAX_TIMESTEPS
+from config import MAX_TIMESTEPS
 import time
 
 
@@ -35,7 +35,7 @@ class Worker:
         """
         Main loop for the worker. Runs continuously, playing episodes and checking for parameter updates.
         """
-        self.policy_network = BackgammonPolicyNetwork(use_sigmoid=USE_SIGMOID)
+        self.policy_network = BackgammonPolicyNetwork()
         state_dict = self.parameter_manager.get_parameters()
         self.policy_network.load_state_dict(state_dict)
         self.current_version = self.parameter_manager.get_version()
@@ -61,6 +61,22 @@ class Worker:
                 )
 
     def play_episode(self, env, max_steps=MAX_TIMESTEPS):
+        """
+        Executes a single episode within the given environment using the agent's policy network.
+
+        Args:
+            env (BackgammonEnv): The environment to interact with, providing methods like `reset()`
+                                 and `step(action)`, and attributes such as `action_mask` and `legal_moves`.
+            max_steps (int, optional): The maximum number of steps to perform in the episode.
+                                       Defaults to `MAX_TIMESTEPS`.
+
+        Returns:
+            Episode: An `Episode` object containing the sequence of experiences collected during the episode.
+
+        Side Effects:
+            - Prints profiling data for various processing steps.
+            - Logs a message if the episode reaches the maximum number of steps.
+        """
         episode = Episode()
         observation = env.reset()
 

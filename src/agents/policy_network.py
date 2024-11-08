@@ -28,7 +28,6 @@ class BackgammonPolicyNetwork(nn.Module):
                           Default is 198, corresponding to the board state representation.
         hidden_size (int): The number of neurons in the hidden fully connected layer.
                            Default is 128.
-        use_sigmoid (bool): If True, use sigmoid activation; if False, use ReLU. Default is False (ReLU).
 
     Attributes:
         fc1 (nn.Linear): The fully connected layer mapping inputs to hidden representations.
@@ -42,17 +41,15 @@ class BackgammonPolicyNetwork(nn.Module):
         >>> log_probs, state_values = model(board_features, action_mask)
     """
 
-    def __init__(self, input_size=198, hidden_size=128, use_sigmoid=False):
+    def __init__(self, input_size=198, hidden_size=128):
         """
         Initializes the BackgammonPolicyNetwork.
 
         Args:
             input_size (int, optional): Size of the input feature vector. Default is 198.
             hidden_size (int, optional): Number of neurons in the hidden layer. Default is 128.
-            use_sigmoid (bool): If True, use sigmoid activation; if False, use ReLU. Default is False (ReLU).
         """
         super(BackgammonPolicyNetwork, self).__init__()
-        self.use_sigmoid = use_sigmoid
         # Define layers
         self.fc1 = nn.Linear(input_size, hidden_size)
         self.action_head = nn.Linear(hidden_size, 1)
@@ -80,10 +77,8 @@ class BackgammonPolicyNetwork(nn.Module):
             state_values (torch.Tensor): Tensor containing state value estimates for each action.
                                          Shape: (batch_size,)
         """
-        if self.use_sigmoid:
-            x = torch.sigmoid(self.fc1(x))  # Sigmoid activation for hidden layer
-        else:
-            x = torch.relu(self.fc1(x))  # ReLU activation for hidden layer
+
+        x = torch.relu(self.fc1(x))  # ReLU activation for hidden layer
 
         logits = self.action_head(x).squeeze(-1)  # Action logits
         state_values = self.value_head(x).squeeze(-1)  # State value estimates
