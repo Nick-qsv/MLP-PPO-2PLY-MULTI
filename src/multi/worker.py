@@ -144,14 +144,13 @@ class Worker:
             action_probs = F.softmax(action_logits, dim=0)
             m = Categorical(probs=action_probs)
             action_idx = m.sample().item()
-            action = env.legal_moves[action_idx]
             next_state_value = action_state_values[action_idx].item()
             action_log_prob = m.log_prob(torch.tensor(action_idx)).item()
             end_timer("Sample Action Stochastically")
 
             # Take action in env
             start_timer("Env Step")
-            next_observation, reward, done, info = env.step(action)
+            next_observation, reward, done, info = env.step(action_idx)
             end_timer("Env Step")
 
             # Create and add Experience
