@@ -38,6 +38,12 @@ class Experience:
             val = getattr(self, attr)
             if isinstance(val, np.ndarray):
                 setattr(self, attr, torch.from_numpy(val))
+            elif isinstance(val, float):
+                setattr(self, attr, torch.tensor(val, dtype=torch.float32))
+            elif isinstance(val, int):
+                setattr(self, attr, torch.tensor(val, dtype=torch.int64))
+            elif isinstance(val, bool):
+                setattr(self, attr, torch.tensor(val, dtype=torch.bool))
             elif val is not None and hasattr(val, "to_tensor"):
                 val.to_tensor()
 
