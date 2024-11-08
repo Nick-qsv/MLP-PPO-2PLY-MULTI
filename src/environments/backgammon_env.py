@@ -76,6 +76,8 @@ class BackgammonEnv(gym.Env):
             device=self.device,
         )
         self.legal_moves = []  # List of FullMove objects
+        self.num_moves = 0
+        self.previous_num_moves = 0
 
         self.worker_id = worker_id
         self.profiling_data = {}
@@ -143,6 +145,7 @@ class BackgammonEnv(gym.Env):
 
         if not self.action_mask[action].item():
             reward = torch.tensor(REWARD_INVALID_ACTION, device=self.device)
+            print(f"Worker {self.worker_id}: Invalid action {action}")
             done = False
             observation = self.get_observation()
             return observation, reward, done, {**info, "info": "Invalid action"}
@@ -233,20 +236,29 @@ class BackgammonEnv(gym.Env):
             legal_board_features = legal_board_features[: self.max_legal_moves]
             self.legal_moves = self.legal_moves[: self.max_legal_moves]
             num_moves = self.max_legal_moves
-        else:
-            self.legal_moves = self.legal_moves[:num_moves]
 
-        # Optionally, you can return num_moves if needed
         self.num_moves = num_moves
 
     def update_action_mask(self):
         """
-        Update the action mask tensor based on the number of legal moves.
+        Update the action mask tensor based on the number of legal moves without resetting the entire tensor.
         """
         try:
-            self.action_mask.zero_()
-            if self.num_moves > 0:
-                self.action_mask[: self.num_moves].fill_(1.0)
+            # Ensure self.num_moves does not exceed self.max_legal_moves
+            current_num_moves = min(self.num_moves, self.max_legal_moves)
+
+            # Determine if num_moves has increased or decreased
+            if current_num_moves > self.previous_num_moves:
+                # Set the new valid actions to 1.0
+                self.action_mask[self.previous_num_moves : current_num_moves].fill_(1.0)
+            elif current_num_moves < self.previous_num_moves:
+                # Reset the now-invalid actions back to 0.0
+                self.action_mask[current_num_moves : self.previous_num_moves].zero_()
+            # If current_num_moves == previous_num_moves, do nothing
+
+            # Update the previous_num_moves for the next call
+            self.previous_num_moves = current_num_moves
+
         except Exception as e:
             print(f"Worker {self.worker_id}: Error updating action_mask: {e}")
             return

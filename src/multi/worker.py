@@ -136,40 +136,45 @@ class Worker:
             end_timer("Split Outputs")
 
             if legal_moves:
-                # Select the best action
-                start_timer("Select Best Action")
-                if action_state_values.numel() > 0 and action_mask.sum() > 0:
-                    best_action_idx = torch.argmax(
-                        action_state_values
-                    ).item()  # Integer between 0 and 499
-                    next_state_value = action_state_values[best_action_idx].item()
-                    action = best_action_idx  # Index corresponds to the action in env's action space
+                # Sample an action stochastically
+                start_timer("Sample Action Stochastically")
+                if action_logits.numel() > 0 and action_mask.sum() > 0:
+                    # Apply masking to logits
+                    masked_logits = action_logits.clone()
+                    masked_logits[action_mask == 0] = -float(
+                        "inf"
+                    )  # Mask invalid actions
+
+                    # Convert logits to probabilities
+                    action_probs = torch.exp(masked_logits)
+
+                    # Create a Categorical distribution
+                    m = torch.distributions.Categorical(probs=action_probs)
+
+                    # Sample an action
+                    action_idx = m.sample().item()  # Index in action_logits
+
+                    # Get the next state value
+                    next_state_value = action_state_values[action_idx].item()
+
+                    # Get the log probability of the sampled action
+                    action_log_prob = (
+                        masked_logits[action_idx].item()
+                        - torch.logsumexp(masked_logits, dim=0).item()
+                    )
                 else:
                     # Handle the case where no valid actions are found
                     print(
                         f"Worker {self.worker_id}: No valid actions found despite having legal moves."
                     )
                     action = None
-                    next_state_value = None
-                end_timer("Select Best Action")
-
-                # Compute action log probability
-                start_timer("Compute Action Log Prob")
-                if action is not None:
-                    # Apply masking to logits to ensure only valid actions are considered
-                    masked_logits = action_logits.clone()
-                    masked_logits[action_mask == 0] = -1e9  # Mask invalid actions
-
-                    # Compute log probabilities
-                    action_log_probs = F.log_softmax(masked_logits, dim=0)
-                    action_log_prob = action_log_probs[action].item()
-                else:
                     action_log_prob = None
-                end_timer("Compute Action Log Prob")
+                    next_state_value = None
+                end_timer("Sample Action Stochastically")
 
                 # Take action in env
                 start_timer("Env Step")
-                next_observation, reward, done, info = env.step(action)
+                next_observation, reward, done, info = env.step(action_idx)
                 end_timer("Env Step")
             else:
                 # No legal moves, pass turn
@@ -186,7 +191,7 @@ class Worker:
             experience = Experience(
                 observation=observation,
                 action_mask=action_mask,
-                action=action,
+                action=action_idx if legal_moves else None,
                 action_log_prob=action_log_prob,
                 state_value=(
                     original_state_value.item()
