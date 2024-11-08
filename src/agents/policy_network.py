@@ -94,3 +94,29 @@ class BackgammonPolicyNetwork(nn.Module):
         x = torch.relu(self.fc1(x))
         state_value = self.value_head(x).squeeze(-1)
         return state_value
+
+    def forward_combined(self, x):
+        """
+        Forward pass for a batch of action states, excluding the first action in the batch
+        for the logits computation, but including it for the state value estimates.
+
+        Args:
+            x (torch.Tensor): Input tensor containing batch of action state features.
+                            Shape: (batch_size, 198)
+
+        Returns:
+            logits (torch.Tensor): Action logits for each action state (excluding first).
+                                Shape: (batch_size - 1,)
+            state_values (torch.Tensor): State value estimates for each action state (including first).
+                                        Shape: (batch_size,)
+        """
+        # Compute logits with x excluding the first action
+        x_excl_first_action = x[1:]  # Shape: (batch_size - 1, 198)
+        x_logit = torch.relu(self.fc1(x_excl_first_action))
+        logits = self.action_head(x_logit).squeeze(-1)  # Shape: (batch_size - 1,)
+
+        # Compute state values with the full tensor x
+        x_value = torch.relu(self.fc1(x))  # Shape: (batch_size, hidden_dim)
+        state_values = self.value_head(x_value).squeeze(-1)  # Shape: (batch_size,)
+
+        return logits, state_values

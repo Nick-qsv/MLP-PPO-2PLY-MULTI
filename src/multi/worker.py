@@ -116,31 +116,33 @@ class Worker:
                 step_count += 1
                 continue  # Skip adding experience and forward pass
 
-            # Process current observation separately to get state value
-            start_timer("Process Current Observation")
-            with torch.no_grad():
-                original_state_value = self.policy_network.get_state_value(
-                    observation.unsqueeze(0)
-                ).item()
-            end_timer("Process Current Observation")
-
-            # Prepare valid action states
+            # Prepare valid action states and concatenate with current observation
             start_timer("Prepare Valid Action States")
             resulting_states = env.legal_board_features[
                 :num_moves
             ]  # Shape: (num_moves, 198)
+            x = torch.cat(
+                [observation.unsqueeze(0), resulting_states], dim=0
+            )  # Shape: (num_moves + 1, 198)
             end_timer("Prepare Valid Action States")
 
-            # Perform a forward pass on valid actions
+            # Perform a forward pass using forward_combined
             start_timer("Policy Network Forward Pass on Actions")
             with torch.no_grad():
-                action_logits, action_state_values = self.policy_network(
-                    resulting_states
-                )
+                logits, state_values = self.policy_network.forward_combined(x)
             end_timer("Policy Network Forward Pass on Actions")
-
+            start_timer("Extract State Values")
+            # Extract state values
+            original_state_value = state_values[
+                0
+            ].item()  # State value for current observation
+            action_state_values = state_values[
+                1:
+            ]  # State values for resulting states (num_moves,)
+            end_timer("Extract State Values")
             # Sample an action stochastically
             start_timer("Sample Action Stochastically")
+            action_logits = logits  # Logits correspond to actions
             action_probs = F.softmax(action_logits, dim=0)
             m = Categorical(probs=action_probs)
             action_idx = m.sample().item()
