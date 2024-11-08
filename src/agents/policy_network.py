@@ -78,16 +78,19 @@ class BackgammonPolicyNetwork(nn.Module):
                                          Shape: (batch_size,)
         """
 
-        x = torch.relu(self.fc1(x))  # ReLU activation for hidden layer
+        x = torch.relu(self.fc1(x))
+        logits = self.action_head(x).squeeze(-1)
+        state_values = self.value_head(x).squeeze(-1)
 
-        logits = self.action_head(x).squeeze(-1)  # Action logits
-        state_values = self.value_head(x).squeeze(-1)  # State value estimates
-
-        # Adjust logits for invalid actions
+        # Filter out invalid actions
         mask = action_mask.to(dtype=torch.bool, device=logits.device)
-        masked_logits = logits.masked_fill(~mask, -1e9)
+        valid_logits = logits[mask]
 
-        # Compute log probabilities across the batch dimension
-        log_probs = F.log_softmax(masked_logits, dim=0)
+        # Compute log probabilities over valid actions
+        valid_log_probs = F.log_softmax(valid_logits, dim=0)
+
+        # Initialize log_probs with -inf and fill in valid positions
+        log_probs = torch.full_like(logits, fill_value=float("-inf"))
+        log_probs[mask] = valid_log_probs
 
         return log_probs, state_values
