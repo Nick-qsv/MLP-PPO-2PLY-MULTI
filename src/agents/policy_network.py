@@ -60,37 +60,37 @@ class BackgammonPolicyNetwork(nn.Module):
         nn.init.xavier_uniform_(self.action_head.weight)
         nn.init.xavier_uniform_(self.value_head.weight)
 
-    def forward(self, x, action_mask):
+    def forward(self, x):
         """
-        Defines the forward pass of the network.
+        Forward pass for a batch of action states.
 
         Args:
-            x (torch.Tensor): Input tensor containing batch of board state features.
+            x (torch.Tensor): Input tensor containing batch of action state features.
                               Shape: (batch_size, 198)
-            action_mask (torch.Tensor): Tensor containing action masks.
-                                        Shape: (batch_size,), elements are 1 (valid action) or 0 (invalid action)
 
         Returns:
-            log_probs (torch.Tensor): Log probabilities over the batch of actions.
-                                      Invalid actions have log probabilities set to a large negative value.
-                                      Shape: (batch_size,)
-            state_values (torch.Tensor): Tensor containing state value estimates for each action.
+            logits (torch.Tensor): Action logits for each action state.
+                                   Shape: (batch_size,)
+            state_values (torch.Tensor): State value estimates for each action state.
                                          Shape: (batch_size,)
         """
-
         x = torch.relu(self.fc1(x))
         logits = self.action_head(x).squeeze(-1)
         state_values = self.value_head(x).squeeze(-1)
+        return logits, state_values
 
-        # Filter out invalid actions
-        mask = action_mask.to(dtype=torch.bool, device=logits.device)
-        valid_logits = logits[mask]
+    def get_state_value(self, x):
+        """
+        Computes the state value for the current observation.
 
-        # Compute log probabilities over valid actions
-        valid_log_probs = F.log_softmax(valid_logits, dim=0)
+        Args:
+            x (torch.Tensor): Input tensor containing the current observation.
+                              Shape: (1, 198)
 
-        # Initialize log_probs with -inf and fill in valid positions
-        log_probs = torch.full_like(logits, fill_value=float("-inf"))
-        log_probs[mask] = valid_log_probs
-
-        return log_probs, state_values
+        Returns:
+            state_value (torch.Tensor): State value estimate for the current observation.
+                                        Shape: (1,)
+        """
+        x = torch.relu(self.fc1(x))
+        state_value = self.value_head(x).squeeze(-1)
+        return state_value
