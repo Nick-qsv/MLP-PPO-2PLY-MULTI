@@ -63,20 +63,18 @@ class Worker:
 
     def play_episode(self, env, max_steps=MAX_TIMESTEPS):
         """
-        Executes a single episode within the given environment using the agent's policy network.
+        Execute a single episode in the given environment using the policy network.
 
         Args:
-            env (BackgammonEnv): The environment to interact with, providing methods like `reset()`
-                                 and `step(action)`, and attributes such as `action_mask` and `legal_moves`.
-            max_steps (int, optional): The maximum number of steps to perform in the episode.
-                                       Defaults to `MAX_TIMESTEPS`.
+            env (Environment): The environment to interact with, providing methods like `reset()` and `step(action)`, and attributes such as `num_moves`, `legal_board_features`, and `legal_moves`.
+            max_steps (int, optional): Maximum number of steps to run in the episode. Defaults to `MAX_TIMESTEPS`.
 
         Returns:
-            Episode: An `Episode` object containing the sequence of experiences collected during the episode.
+            Episode: An `Episode` object containing the sequence of experiences gathered during the episode.
 
-        Side Effects:
-            - Prints profiling data for various processing steps.
-            - Logs a message if the episode reaches the maximum number of steps.
+        Notes:
+            - Profiles the execution time of key operations and prints profiling data after the episode.
+            - Handles cases with no legal moves by taking a no-op action.
         """
         episode = Episode()
         observation = env.reset()
@@ -101,14 +99,13 @@ class Worker:
         step_count = 0
 
         while not done and step_count < max_steps:
-            # Start profiling for environment action mask retrieval
-            start_timer("Retrieve Action Mask")
-            action_mask = env.action_mask.clone()  # Shape: (500,)
-            legal_moves = env.legal_moves
-            end_timer("Retrieve Action Mask")
+            # Retrieve the exact number of valid legal moves
+            start_timer("Retrieve Number of Moves")
+            num_moves = env.num_moves  # Number of valid legal moves
+            end_timer("Retrieve Number of Moves")
 
-            # Skip if there are no legal moves
-            if not legal_moves:
+            # Handle the case where there are no legal moves
+            if num_moves == 0:
                 # No legal moves, take a no-op action (pass turn)
                 start_timer("Env Step (No Action)")
                 next_observation, reward, done, info = env.step(None)
@@ -119,87 +116,52 @@ class Worker:
                 step_count += 1
                 continue  # Skip adding experience and forward pass
 
-            # Prepare combined_states and combined_action_mask
-            start_timer("Prepare Combined States and Action Mask")
-            original_observation = observation.unsqueeze(0)  # Shape: (1, 198)
-            resulting_states = env.legal_board_features  # Shape: (500, 198)
-            combined_states = torch.cat(
-                [original_observation, resulting_states], dim=0
-            )  # Shape: (501, 198)
-
-            # Prepare combined action mask
-            original_mask = torch.tensor([0], dtype=torch.float32)
-            legal_masks = action_mask.to(dtype=torch.float32)  # Shape: (500,)
-            combined_action_mask = torch.cat(
-                [original_mask, legal_masks], dim=0
-            )  # Shape: (501,)
-            end_timer("Prepare Combined States and Action Mask")
-
-            # Perform a forward pass
-            start_timer("Policy Network Forward Pass (Combined States)")
-            # with profiler.profile(record_shapes=True) as prof:
+            # Process current observation separately to get state value
+            start_timer("Process Current Observation")
             with torch.no_grad():
-                logits, state_values = self.policy_network(
-                    combined_states, combined_action_mask
-                )
-            # print(prof.key_averages().table(sort_by="cpu_time_total"))
-            end_timer("Policy Network Forward Pass (Combined States)")
+                original_state_value = self.policy_network.get_state_value(
+                    observation.unsqueeze(0)
+                ).item()
+            end_timer("Process Current Observation")
 
-            # Split the outputs
-            start_timer("Split Outputs")
-            original_logit = logits[0]  # Not selectable
-            original_state_value = state_values[0]
-            action_logits = logits[1:]  # Shape: (500,)
-            action_state_values = state_values[1:]  # Shape: (500,)
-            end_timer("Split Outputs")
+            # Prepare valid action states
+            start_timer("Prepare Valid Action States")
+            resulting_states = env.legal_board_features[
+                :num_moves
+            ]  # Shape: (num_moves, 198)
+            end_timer("Prepare Valid Action States")
+
+            # Perform a forward pass on valid actions
+            start_timer("Policy Network Forward Pass on Actions")
+            with torch.no_grad():
+                action_logits, action_state_values = self.policy_network(
+                    resulting_states
+                )
+            end_timer("Policy Network Forward Pass on Actions")
 
             # Sample an action stochastically
             start_timer("Sample Action Stochastically")
-            if action_logits.numel() > 0 and action_mask.sum() > 0:
-                # Apply masking to logits
-                masked_logits = action_logits.clone()
-                masked_logits[action_mask == 0] = -float("inf")  # Mask invalid actions
-
-                # Convert logits to probabilities
-                action_probs = torch.exp(masked_logits)
-
-                # Create a Categorical distribution
-                m = torch.distributions.Categorical(probs=action_probs)
-
-                # Sample an action
-                action_idx = m.sample().item()  # Index in action_logits
-
-                # Get the next state value
-                next_state_value = action_state_values[action_idx].item()
-
-                # Get the log probability of the sampled action
-                action_log_prob = (
-                    masked_logits[action_idx].item()
-                    - torch.logsumexp(masked_logits, dim=0).item()
-                )
-            else:
-                # Handle the case where no valid actions are found
-                print(
-                    f"Worker {self.worker_id}: No valid actions found despite having legal moves."
-                )
-                action = None
-                action_log_prob = None
-                next_state_value = None
+            action_probs = F.softmax(action_logits, dim=0)
+            m = Categorical(probs=action_probs)
+            action_idx = m.sample().item()
+            action = env.legal_moves[action_idx]
+            next_state_value = action_state_values[action_idx].item()
+            action_log_prob = m.log_prob(torch.tensor(action_idx)).item()
             end_timer("Sample Action Stochastically")
 
             # Take action in env
             start_timer("Env Step")
-            next_observation, reward, done, info = env.step(action_idx)
+            next_observation, reward, done, info = env.step(action)
             end_timer("Env Step")
 
             # Create and add Experience
             start_timer("Create Experience")
             experience = Experience(
                 observation=observation,
-                action_mask=action_mask,
+                action_mask=None,
                 action=action_idx,
                 action_log_prob=action_log_prob,
-                state_value=original_state_value.item(),
+                state_value=original_state_value,
                 reward=reward,
                 done=done,
                 next_observation=next_observation,

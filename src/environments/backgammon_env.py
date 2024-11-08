@@ -210,9 +210,7 @@ class BackgammonEnv(gym.Env):
                 )
             else:
                 legal_board_features = torch.empty(
-                    (0, self.board_feature_length),
-                    dtype=torch.float32,
-                    device=self.device,
+                    (0, self.board_feature_length), dtype=torch.float32
                 )
         except Exception as e:
             print(f"Worker {self.worker_id}: Error in generate_all_board_features: {e}")
