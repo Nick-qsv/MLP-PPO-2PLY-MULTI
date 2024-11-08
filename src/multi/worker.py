@@ -106,29 +106,32 @@ class Worker:
             legal_moves = env.legal_moves
             end_timer("Retrieve Action Mask")
 
+            # Skip if there are no legal moves
+            if not legal_moves:
+                # No legal moves, take a no-op action (pass turn)
+                start_timer("Env Step (No Action)")
+                next_observation, reward, done, info = env.step(None)
+                end_timer("Env Step (No Action)")
+
+                # Move to next observation
+                observation = next_observation
+                step_count += 1
+                continue  # Skip adding experience and forward pass
+
             # Prepare combined_states and combined_action_mask
             start_timer("Prepare Combined States and Action Mask")
             original_observation = observation.unsqueeze(0)  # Shape: (1, 198)
-            if legal_moves:
-                resulting_states = env.legal_board_features  # Shape: (500, 198)
-                combined_states = torch.cat(
-                    [original_observation, resulting_states], dim=0
-                )  # Shape: (501, 198)
+            resulting_states = env.legal_board_features  # Shape: (500, 198)
+            combined_states = torch.cat(
+                [original_observation, resulting_states], dim=0
+            )  # Shape: (501, 198)
 
-                # Prepare combined action mask
-                original_mask = torch.tensor([0], dtype=torch.float32)
-                legal_masks = action_mask.to(
-                    dtype=torch.float32, device=self.device
-                )  # Shape: (500,)
-                combined_action_mask = torch.cat(
-                    [original_mask, legal_masks], dim=0
-                )  # Shape: (501,)
-            else:
-                # No legal moves, only the original observation
-                combined_states = original_observation  # Shape: (1, 198)
-                combined_action_mask = torch.tensor(
-                    [0], dtype=torch.float32
-                )  # Shape: (1,)
+            # Prepare combined action mask
+            original_mask = torch.tensor([0], dtype=torch.float32)
+            legal_masks = action_mask.to(dtype=torch.float32)  # Shape: (500,)
+            combined_action_mask = torch.cat(
+                [original_mask, legal_masks], dim=0
+            )  # Shape: (501,)
             end_timer("Prepare Combined States and Action Mask")
 
             # Perform a forward pass
@@ -143,77 +146,57 @@ class Worker:
             start_timer("Split Outputs")
             original_logit = logits[0]  # Not selectable
             original_state_value = state_values[0]
-            if legal_moves:
-                action_logits = logits[1:]  # Shape: (500,)
-                action_state_values = state_values[1:]  # Shape: (500,)
-            else:
-                action_logits = torch.tensor([])
-                action_state_values = torch.tensor([])
+            action_logits = logits[1:]  # Shape: (500,)
+            action_state_values = state_values[1:]  # Shape: (500,)
             end_timer("Split Outputs")
 
-            if legal_moves:
-                # Sample an action stochastically
-                start_timer("Sample Action Stochastically")
-                if action_logits.numel() > 0 and action_mask.sum() > 0:
-                    # Apply masking to logits
-                    masked_logits = action_logits.clone()
-                    masked_logits[action_mask == 0] = -float(
-                        "inf"
-                    )  # Mask invalid actions
+            # Sample an action stochastically
+            start_timer("Sample Action Stochastically")
+            if action_logits.numel() > 0 and action_mask.sum() > 0:
+                # Apply masking to logits
+                masked_logits = action_logits.clone()
+                masked_logits[action_mask == 0] = -float("inf")  # Mask invalid actions
 
-                    # Convert logits to probabilities
-                    action_probs = torch.exp(masked_logits)
+                # Convert logits to probabilities
+                action_probs = torch.exp(masked_logits)
 
-                    # Create a Categorical distribution
-                    m = torch.distributions.Categorical(probs=action_probs)
+                # Create a Categorical distribution
+                m = torch.distributions.Categorical(probs=action_probs)
 
-                    # Sample an action
-                    action_idx = m.sample().item()  # Index in action_logits
+                # Sample an action
+                action_idx = m.sample().item()  # Index in action_logits
 
-                    # Get the next state value
-                    next_state_value = action_state_values[action_idx].item()
+                # Get the next state value
+                next_state_value = action_state_values[action_idx].item()
 
-                    # Get the log probability of the sampled action
-                    action_log_prob = (
-                        masked_logits[action_idx].item()
-                        - torch.logsumexp(masked_logits, dim=0).item()
-                    )
-                else:
-                    # Handle the case where no valid actions are found
-                    print(
-                        f"Worker {self.worker_id}: No valid actions found despite having legal moves."
-                    )
-                    action = None
-                    action_log_prob = None
-                    next_state_value = None
-                end_timer("Sample Action Stochastically")
-
-                # Take action in env
-                start_timer("Env Step")
-                next_observation, reward, done, info = env.step(action_idx)
-                end_timer("Env Step")
+                # Get the log probability of the sampled action
+                action_log_prob = (
+                    masked_logits[action_idx].item()
+                    - torch.logsumexp(masked_logits, dim=0).item()
+                )
             else:
-                # No legal moves, pass turn
+                # Handle the case where no valid actions are found
+                print(
+                    f"Worker {self.worker_id}: No valid actions found despite having legal moves."
+                )
                 action = None
                 action_log_prob = None
                 next_state_value = None
-                # Take action in env (pass)
-                start_timer("Env Step (No Action)")
-                next_observation, reward, done, info = env.step(action)
-                end_timer("Env Step (No Action)")
+            end_timer("Sample Action Stochastically")
 
-            # Create Experience
+            # Take action in env
+            start_timer("Env Step")
+            next_observation, reward, done, info = env.step(action_idx)
+            end_timer("Env Step")
+
+            # Create and add Experience
             start_timer("Create Experience")
             experience = Experience(
                 observation=observation,
                 action_mask=action_mask,
-                action=action_idx if legal_moves else None,
+                action=action_idx,
                 action_log_prob=action_log_prob,
-                state_value=(
-                    original_state_value.item()
-                    if original_state_value is not None
-                    else None
-                ),
+                state_value=original_state_value.item(),
                 reward=reward,
                 done=done,
                 next_observation=next_observation,
@@ -221,7 +204,6 @@ class Worker:
             )
             end_timer("Create Experience")
 
-            # Add experience to episode
             start_timer("Add Experience to Episode")
             episode.add_experience(experience)
             end_timer("Add Experience to Episode")
