@@ -159,7 +159,6 @@ class Worker:
             start_timer("Create Experience")
             experience = Experience(
                 observation=observation,
-                action_mask=None,
                 action=action_idx,
                 action_log_prob=action_log_prob,
                 state_value=original_state_value,

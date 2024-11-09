@@ -59,7 +59,6 @@ class Trainer:
         dones = []
         state_values = []
         next_state_values = []
-        action_masks = []
         advantages = []
 
         for episode in episodes:
@@ -71,31 +70,15 @@ class Trainer:
             episode_dones = []
             episode_state_values = []
             episode_next_state_values = []
-            episode_action_masks = []
 
             for experience in episode.experiences:
                 episode_observations.append(experience.observation)
-                episode_actions.append(
-                    experience.action if experience.action is not None else -1
-                )
-                episode_action_log_probs.append(
-                    experience.action_log_prob
-                    if experience.action_log_prob is not None
-                    else torch.tensor(0.0)
-                )
+                episode_actions.append(experience.action)
+                episode_action_log_probs.append(experience.action_log_prob)
                 episode_rewards.append(experience.reward)
                 episode_dones.append(experience.done)
-                episode_state_values.append(
-                    experience.state_value
-                    if experience.state_value is not None
-                    else torch.tensor(0.0)
-                )
-                episode_next_state_values.append(
-                    experience.next_state_value
-                    if experience.next_state_value is not None
-                    else torch.tensor(0.0)
-                )
-                episode_action_masks.append(experience.action_mask)
+                episode_state_values.append(experience.state_value)
+                episode_next_state_values.append(experience.next_state_value)
 
             # Compute GAE for this episode
             gae = 0
@@ -120,7 +103,6 @@ class Trainer:
             dones.extend(episode_dones)
             state_values.extend(episode_state_values)
             next_state_values.extend(episode_next_state_values)
-            action_masks.extend(episode_action_masks)
 
         # Convert lists to tensors
         observations = torch.stack(observations).to(self.device)
@@ -130,7 +112,6 @@ class Trainer:
         dones = torch.tensor(dones, dtype=torch.float32).to(self.device)
         state_values = torch.stack(state_values).to(self.device)
         next_state_values = torch.stack(next_state_values).to(self.device)
-        action_masks = torch.stack(action_masks).to(self.device)
         advantages = torch.tensor(advantages).to(self.device)
 
         # Normalize advantages
@@ -149,43 +130,31 @@ class Trainer:
                 batch_advantages = advantages[batch_indices]
                 batch_old_action_log_probs = old_action_log_probs[batch_indices]
                 batch_state_values = state_values[batch_indices]
-                batch_action_masks = action_masks[batch_indices]
 
                 # Evaluate current policy
                 logits, state_values_pred = self.policy_network(batch_observations)
                 state_values_pred = state_values_pred.squeeze(-1)
 
                 # Compute action probabilities
-                masked_logits = logits + (batch_action_masks - 1) * 1e10
-                action_probs = F.softmax(masked_logits, dim=-1)
+                action_probs = F.softmax(logits, dim=-1)
                 dist = Categorical(action_probs)
 
                 # Compute entropy
                 entropy = dist.entropy().mean()
 
                 # Compute new action log probs
-                valid_actions_mask = batch_actions != -1
-                new_action_log_probs = torch.zeros_like(batch_old_action_log_probs)
-                if valid_actions_mask.any():
-                    new_action_log_probs[valid_actions_mask] = dist.log_prob(
-                        batch_actions[valid_actions_mask]
-                    )
+                new_action_log_probs = dist.log_prob(batch_actions)
 
-                    # Compute ratio
-                    ratios = torch.exp(
-                        new_action_log_probs[valid_actions_mask]
-                        - batch_old_action_log_probs[valid_actions_mask]
-                    )
+                # Compute ratio
+                ratios = torch.exp(new_action_log_probs - batch_old_action_log_probs)
 
-                    # Compute surrogate loss
-                    surr1 = ratios * batch_advantages[valid_actions_mask]
-                    surr2 = (
-                        torch.clamp(ratios, 1 - self.epsilon, 1 + self.epsilon)
-                        * batch_advantages[valid_actions_mask]
-                    )
-                    actor_loss = -torch.min(surr1, surr2).mean()
-                else:
-                    actor_loss = torch.tensor(0.0).to(self.device)
+                # Compute surrogate loss
+                surr1 = ratios * batch_advantages
+                surr2 = (
+                    torch.clamp(ratios, 1 - self.epsilon, 1 + self.epsilon)
+                    * batch_advantages
+                )
+                actor_loss = -torch.min(surr1, surr2).mean()
 
                 # Critic loss (value function loss)
                 critic_loss = F.mse_loss(state_values_pred, batch_state_values)

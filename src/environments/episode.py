@@ -6,7 +6,6 @@ class Experience:
     def __init__(
         self,
         observation,
-        action_mask,
         action,
         action_log_prob,
         state_value,
@@ -16,7 +15,6 @@ class Experience:
         next_state_value,
     ):
         self.observation = observation
-        self.action_mask = action_mask
         self.action = action
         self.action_log_prob = action_log_prob
         self.state_value = state_value
