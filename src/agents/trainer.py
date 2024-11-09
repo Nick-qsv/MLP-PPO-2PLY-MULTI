@@ -118,7 +118,6 @@ class Trainer:
         advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
 
         old_action_log_probs = action_log_probs.detach()
-        old_actions = actions.detach()
 
         # PPO policy update
         for _ in range(self.K_epochs):
@@ -181,7 +180,7 @@ class Trainer:
         # After update, update entropy coefficient
         self.update_entropy_coef()
         # After update, update parameters in parameter manager
-        self.parameter_manager.update_parameters(self.policy_network.state_dict())
+        self.parameter_manager.set_parameters(self.policy_network.state_dict())
         self.parameter_manager.increment_version()
 
         end_time = time.time()
