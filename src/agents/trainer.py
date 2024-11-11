@@ -25,16 +25,13 @@ class Trainer:
         # Hyperparameters
         self.gamma = GAMMA
         self.lamda = LAMBDA
-        self.entropy_coef_start = ENTROPY_COEF_START
-        self.entropy_coef_end = ENTROPY_COEF_END
-        self.entropy_anneal_episodes = ENTROPY_ANNEAL_EPISODES
+        self.alpha = LEARNING_RATE
         self.total_episodes = 0
-        self.entropy_coef = self.entropy_coef_start
+        self.grad_clip = GRAD_CLIP_THRESHOLD
+        self.lr_decay = LR_DECAY
+        self.lr_decay_steps = LR_DECAY_STEPS
+        self.batch_episode_size = MIN_EPISODES_TO_TRAIN
 
-        # PPO parameters
-        self.epsilon = EPSILON
-        self.K_epochs = K_EPOCHS
-        self.batch_size = BATCH_SIZE
         # Initialize NVML handle for the GPU
         self.gpu_handle = pynvml.nvmlDeviceGetHandleByIndex(0)  # Assuming single GPU
 

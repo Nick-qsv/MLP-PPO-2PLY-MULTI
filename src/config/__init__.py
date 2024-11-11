@@ -11,12 +11,10 @@ from .configuration import (
     GAMMA,
     LAMBDA,
     LEARNING_RATE,
-    ENTROPY_COEF_START,
-    ENTROPY_COEF_END,
-    ENTROPY_ANNEAL_EPISODES,
-    EPSILON,
-    K_EPOCHS,
-    BATCH_SIZE,
+    GRAD_CLIP_THRESHOLD,
+    LR_DECAY,
+    LR_DECAY_STEPS,
+    BATCH_EPISODE_SIZE,
 )
 
 __all__ = [
@@ -32,10 +30,8 @@ __all__ = [
     "GAMMA",
     "LAMBDA",
     "LEARNING_RATE",
-    "ENTROPY_COEF_START",
-    "ENTROPY_COEF_END",
-    "ENTROPY_ANNEAL_EPISODES",
-    "EPSILON",
-    "K_EPOCHS",
-    "BATCH_SIZE",
+    "GRAD_CLIP_THRESHOLD",
+    "LR_DECAY",
+    "LR_DECAY_STEPS",
+    "BATCH_EPISODE_SIZE",
 ]

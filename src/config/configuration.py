@@ -15,11 +15,6 @@ S3_LOG_PREFIX = "logs/"
 GAMMA = 0.99
 LAMBDA = 0.90
 LEARNING_RATE = 1e-3
-ENTROPY_COEF_START = 0.10
-ENTROPY_COEF_END = 0.02
-ENTROPY_ANNEAL_EPISODES = (
-    200_000  # Number of episodes over which to anneal entropy coefficient
-)
-EPSILON = 0.2  # PPO clipping parameter
-K_EPOCHS = 4  # Number of epochs to update policy
-BATCH_SIZE = 512  # Batch size for mini-batch updates
+GRAD_CLIP_THRESHOLD = 0.5  # Gradient clipping threshold
+LR_DECAY = 0.99  # Learning rate decay
+LR_DECAY_STEPS = 100_000  # Number of steps over which to decay learning rate
