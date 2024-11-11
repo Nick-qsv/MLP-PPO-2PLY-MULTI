@@ -8,6 +8,7 @@ import time
 import torch.autograd.profiler as profiler
 
 
+# about to change to TD from PPO
 class Worker:
     """
     Worker class that runs episodes of Backgammon games using a local copy of the PolicyNetwork.
@@ -100,9 +101,7 @@ class Worker:
 
         while not done and step_count < max_steps:
             # Retrieve the exact number of valid legal moves
-            start_timer("Retrieve Number of Moves")
             num_moves = env.num_moves  # Number of valid legal moves
-            end_timer("Retrieve Number of Moves")
 
             # Handle the case where there are no legal moves
             if num_moves == 0:
@@ -117,21 +116,18 @@ class Worker:
                 continue  # Skip adding experience and forward pass
 
             # Prepare valid action states and concatenate with current observation
-            start_timer("Prepare Valid Action States")
             resulting_states = env.legal_board_features[
                 :num_moves
             ]  # Shape: (num_moves, 198)
             x = torch.cat(
                 [observation.unsqueeze(0), resulting_states], dim=0
             )  # Shape: (num_moves + 1, 198)
-            end_timer("Prepare Valid Action States")
 
             # Perform a forward pass using forward_combined
             start_timer("Policy Network Forward Pass on Actions")
             with torch.no_grad():
                 logits, state_values = self.policy_network.forward_combined(x)
             end_timer("Policy Network Forward Pass on Actions")
-            start_timer("Extract State Values")
             # Extract state values
             original_state_value = state_values[
                 0
@@ -139,7 +135,6 @@ class Worker:
             action_state_values = state_values[
                 1:
             ]  # State values for resulting states (num_moves,)
-            end_timer("Extract State Values")
             # Sample an action stochastically
             start_timer("Sample Action Stochastically")
             action_logits = logits  # Logits correspond to actions
@@ -156,7 +151,6 @@ class Worker:
             end_timer("Env Step")
 
             # Create and add Experience
-            start_timer("Create Experience")
             experience = Experience(
                 observation=observation,
                 action=action_idx,
@@ -167,11 +161,8 @@ class Worker:
                 next_observation=next_observation,
                 next_state_value=next_state_value,
             )
-            end_timer("Create Experience")
 
-            start_timer("Add Experience to Episode")
             episode.add_experience(experience)
-            end_timer("Add Experience to Episode")
 
             # Move to next observation
             observation = next_observation
@@ -181,9 +172,7 @@ class Worker:
             print(f"Worker {self.worker_id}: Reached maximum steps in episode.")
 
         # Convert tensors to NumPy arrays before returning the episode
-        start_timer("Convert Episode to NumPy")
         episode.to_numpy()
-        end_timer("Convert Episode to NumPy")
 
         # Print profiling data
         print(f"\nWorker {self.worker_id} profiling data for this episode:")
