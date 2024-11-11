@@ -15,6 +15,9 @@ from .configuration import (
     LR_DECAY,
     LR_DECAY_STEPS,
     BATCH_EPISODE_SIZE,
+    INITIAL_TEMPERATURE,
+    FINAL_TEMPERATURE,
+    MAX_UPDATES,
 )
 
 __all__ = [
@@ -34,4 +37,7 @@ __all__ = [
     "LR_DECAY",
     "LR_DECAY_STEPS",
     "BATCH_EPISODE_SIZE",
+    "INITIAL_TEMPERATURE",
+    "FINAL_TEMPERATURE",
+    "MAX_UPDATES",
 ]

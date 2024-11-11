@@ -6,6 +6,7 @@ from agents import BackgammonPolicyNetwork
 from config import MAX_TIMESTEPS
 import time
 import torch.autograd.profiler as profiler
+import random
 
 
 # about to change to TD from PPO
@@ -32,6 +33,7 @@ class Worker:
         self.parameter_manager = parameter_manager
         self.experience_queue = experience_queue
         self.device = torch.device("cpu")
+        self.temperature = 1.5
 
     def run(self):
         """
@@ -56,10 +58,11 @@ class Worker:
             if new_version > self.current_version:
                 # Update local PolicyNetwork parameters
                 state_dict = self.parameter_manager.get_parameters()
+                self.temperature = self.parameter_manager.get_temperature()
                 self.policy_network.load_state_dict(state_dict)
                 self.current_version = new_version
                 print(
-                    f"Worker {self.worker_id}: Updated parameters to version {self.current_version}"
+                    f"Worker {self.worker_id}: Updated parameters to version {self.current_version} with temperature {self.temperature}"
                 )
 
     def play_episode(self, env, max_steps=MAX_TIMESTEPS):
@@ -126,7 +129,7 @@ class Worker:
             # Perform a forward pass using forward_combined
             start_timer("Policy Network Forward Pass on Actions")
             with torch.no_grad():
-                logits, state_values = self.policy_network.forward_combined(x)
+                state_values = self.policy_network.forward(x)
             end_timer("Policy Network Forward Pass on Actions")
             # Extract state values
             original_state_value = state_values[
@@ -135,15 +138,23 @@ class Worker:
             action_state_values = state_values[
                 1:
             ]  # State values for resulting states (num_moves,)
-            # Sample an action stochastically
-            start_timer("Sample Action Stochastically")
-            action_logits = logits  # Logits correspond to actions
-            action_probs = F.softmax(action_logits, dim=0)
-            m = Categorical(probs=action_probs)
+
+            # Softmax-Based Action Selection
+            start_timer("Softmax-Based Action Selection")
+
+            # Convert state values to a probability distribution using softmax
+            temperature = (
+                1.5  # Adjust as needed; lower values make the distribution sharper
+            )
+            action_probs = F.softmax(
+                action_state_values / temperature, dim=0
+            )  # Shape: (num_moves,)
+
+            # Create a categorical distribution based on action_probs
+            m = torch.distributions.Categorical(probs=action_probs)
             action_idx = m.sample().item()
-            next_state_value = action_state_values[action_idx].item()
-            action_log_prob = m.log_prob(torch.tensor(action_idx)).item()
-            end_timer("Sample Action Stochastically")
+
+            end_timer("Softmax-Based Action Selection")
 
             # Take action in env
             start_timer("Env Step")
@@ -153,13 +164,11 @@ class Worker:
             # Create and add Experience
             experience = Experience(
                 observation=observation,
-                action=action_idx,
-                action_log_prob=action_log_prob,
                 state_value=original_state_value,
                 reward=reward,
                 done=done,
                 next_observation=next_observation,
-                next_state_value=next_state_value,
+                next_state_value=action_state_values[action_idx].item(),
             )
 
             episode.add_experience(experience)

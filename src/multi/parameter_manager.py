@@ -4,7 +4,13 @@ import numpy as np
 import boto3
 import io
 import os
-from config import S3_BUCKET_NAME, S3_MODEL_PREFIX
+from config import (
+    S3_BUCKET_NAME,
+    S3_MODEL_PREFIX,
+    INITIAL_TEMPERATURE,
+    FINAL_TEMPERATURE,
+    MAX_UPDATES,
+)
 from agents.policy_network import BackgammonPolicyNetwork
 
 
@@ -21,6 +27,11 @@ class ParameterManager:
         version (multiprocessing.Value): A shared integer representing the version number.
         parameters (multiprocessing.Manager.dict): A shared dictionary storing the model parameters.
     """
+
+    # Temperature decay parameters
+    INITIAL_TEMPERATURE = INITIAL_TEMPERATURE
+    FINAL_TEMPERATURE = FINAL_TEMPERATURE
+    MAX_UPDATES = MAX_UPDATES
 
     def __init__(self, lock, version, parameters):
         self.lock = lock
@@ -66,6 +77,26 @@ class ParameterManager:
                 self.parameters[key] = tensor.cpu().numpy()
             # Increment the version number
             self.version.value += 1
+
+    def get_temperature(self):
+        """
+        Calculates the current temperature based on the version number.
+
+        Returns:
+            float: The current temperature.
+        """
+        current_version = self.get_version()
+        if current_version <= 1:
+            return self.INITIAL_TEMPERATURE
+        elif current_version >= 1 + self.MAX_UPDATES:
+            return self.FINAL_TEMPERATURE
+        else:
+            decay_fraction = (current_version - 1) / self.MAX_UPDATES
+            temperature = (
+                self.INITIAL_TEMPERATURE
+                - (self.INITIAL_TEMPERATURE - self.FINAL_TEMPERATURE) * decay_fraction
+            )
+            return temperature
 
     # --- Modified methods for saving and loading ---
 

@@ -18,3 +18,8 @@ LEARNING_RATE = 1e-3
 GRAD_CLIP_THRESHOLD = 0.5  # Gradient clipping threshold
 LR_DECAY = 0.99  # Learning rate decay
 LR_DECAY_STEPS = 100_000  # Number of steps over which to decay learning rate
+
+# Temperature decay parameters
+INITIAL_TEMPERATURE = 1.5
+FINAL_TEMPERATURE = 0.5
+MAX_UPDATES = 2000
