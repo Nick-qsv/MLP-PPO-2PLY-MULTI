@@ -35,6 +35,46 @@ class Trainer:
         # Initialize NVML handle for the GPU
         self.gpu_handle = pynvml.nvmlDeviceGetHandleByIndex(0)  # Assuming single GPU
 
+        # Collect parameter names and list
+        self.param_names = [name for name, _ in self.policy_network.named_parameters()]
+        self.param_list = [param for _, param in self.policy_network.named_parameters()]
+
+        # Initialize tensor pools
+        self._initialize_tensor_pools()
+
+    def _initialize_tensor_pools(self):
+        """
+        Preallocate tensors for delta_w_batch and eligibility_traces.
+        """
+        # Preallocate delta_w_batch (single set)
+        self.delta_w_batch = {
+            name: torch.zeros_like(param, device=self.device)
+            for name, param in zip(self.param_names, self.param_list)
+        }
+
+        # Preallocate a pool of eligibility_traces for 100 episodes
+        self.eligibility_traces_pool = [
+            {
+                name: torch.zeros_like(param, device=self.device)
+                for name, param in zip(self.param_names, self.param_list)
+            }
+            for _ in range(self.batch_episode_size)
+        ]
+
+    def _reset_tensor_pools(self):
+        """
+        Reset (zero) all tensors in delta_w_batch and eligibility_traces_pool using list comprehensions.
+        """
+        # Reset delta_w_batch
+        [tensor.zero_() for tensor in self.delta_w_batch.values()]
+
+        # Reset all eligibility_traces
+        [
+            tensor.zero_()
+            for eligibility_traces in self.eligibility_traces_pool
+            for tensor in eligibility_traces.values()
+        ]
+
     def update(self, episodes):
         # Profile GPU before update
         gpu_util_before = pynvml.nvmlDeviceGetUtilizationRates(self.gpu_handle)
