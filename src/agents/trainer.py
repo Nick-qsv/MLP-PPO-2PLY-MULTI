@@ -76,6 +76,14 @@ class Trainer:
         ]
 
     def update(self, episodes):
+        if len(episodes) != self.batch_episode_size:
+            raise ValueError(
+                f"Expected {self.batch_episode_size} episodes, but got {len(episodes)}."
+            )
+
+        # Reset tensor pools before starting the update
+        self._reset_tensor_pools()
+
         # Profile GPU before update
         gpu_util_before = pynvml.nvmlDeviceGetUtilizationRates(self.gpu_handle)
         mem_info_before = pynvml.nvmlDeviceGetMemoryInfo(self.gpu_handle)
@@ -89,35 +97,22 @@ class Trainer:
         # Update the total episodes
         self.total_episodes += len(episodes)
 
-        # Collect parameters and names
-        param_list = [param for _, param in self.policy_network.named_parameters()]
-        param_names = [name for name, _ in self.policy_network.named_parameters()]
-
-        # Initialize accumulators for parameter updates
-        delta_w_batch = {
-            name: torch.zeros_like(param, device=self.device)
-            for name, param in zip(param_names, param_list)
-        }
-
         # Loop over each episode
-        for episode in episodes:
+        for episode_idx, episode in enumerate(episodes):
             experiences = episode.experiences
 
-            # Initialize eligibility traces for parameters
-            eligibility_traces = {
-                name: torch.zeros_like(param, device=self.device)
-                for name, param in zip(param_names, param_list)
-            }
+            # Retrieve the preallocated eligibility_traces for this episode
+            eligibility_traces = self.eligibility_traces_pool[episode_idx]
 
-            # Collect all observations in the episode
+            # Collect all observations and rewards in the episode
             observations = []
             rewards = []
             for experience in experiences:
-                x_t = experience.observation.to(self.device)
+                x_t = torch.from_numpy(experience.observation).to(self.device)
                 observations.append(x_t)
-                rewards.append(experience.reward.to(self.device))
+                rewards.append(torch.tensor(experience.reward, device=self.device))
 
-            # Stack observations into a tensor
+            # Stack observations and rewards into tensors
             observations = torch.stack(observations)  # Shape: (seq_len, input_size)
             rewards = torch.stack(rewards)  # Shape: (seq_len,)
 
@@ -126,22 +121,24 @@ class Trainer:
 
             # Compute TD errors δ[t]
             delta_values = []
-            for t in range(len(experiences)):
-                if t < len(experiences) - 1:
-                    delta_t = Y_values[t + 1].detach() - Y_values[t]
+            seq_len = len(experiences)
+            for t in range(seq_len):
+                if t < seq_len - 1:
+                    delta_t = (
+                        rewards[t] + self.gamma * Y_values[t + 1].detach() - Y_values[t]
+                    )
                 else:
                     # Terminal state
                     delta_t = rewards[t] - Y_values[t]
                 delta_values.append(delta_t)
 
-            # Process each time step to update eligibility traces and accumulate parameter updates
-            for t in range(len(experiences)):
+            # Process each time step in reverse to correctly update eligibility traces
+            for t in reversed(range(seq_len)):
                 # Zero gradients to prevent accumulation from previous iterations
                 self.policy_network.zero_grad()
 
                 # Compute gradient ∇Y[t] w.r.t parameters
                 Y_t = Y_values[t]
-                # Since Y_t is a scalar, gradients will be computed correctly
                 Y_t.backward(retain_graph=True)
 
                 # Collect gradients
@@ -151,7 +148,7 @@ class Trainer:
                         if param.grad is not None
                         else torch.zeros_like(param)
                     )
-                    for name, param in zip(param_names, param_list)
+                    for name, param in zip(self.param_names, self.param_list)
                 }
 
                 # Update eligibility traces
@@ -163,30 +160,34 @@ class Trainer:
 
                 # Compute Δw[t] = α δ[t] e[t]
                 delta_t = delta_values[t]
-                for name in delta_w_batch:
+                for name in self.delta_w_batch:
                     delta_w_t = self.alpha * delta_t * eligibility_traces[name]
-                    delta_w_batch[name] += delta_w_t
+                    self.delta_w_batch[name] += delta_w_t
 
                 # Clear gradients after use
                 self.policy_network.zero_grad()
 
-                # Update maximum GPU utilization
-                gpu_util_current = pynvml.nvmlDeviceGetUtilizationRates(self.gpu_handle)
-                mem_info_current = pynvml.nvmlDeviceGetMemoryInfo(self.gpu_handle)
-                max_gpu_util = max(max_gpu_util, gpu_util_current.gpu)
-                max_mem_used = max(max_mem_used, mem_info_current.used)
+            # Update maximum GPU utilization
+            gpu_util_current = pynvml.nvmlDeviceGetUtilizationRates(self.gpu_handle)
+            mem_info_current = pynvml.nvmlDeviceGetMemoryInfo(self.gpu_handle)
+            max_gpu_util = max(max_gpu_util, gpu_util_current.gpu)
+            max_mem_used = max(max_mem_used, mem_info_current.used)
 
-        # Apply the accumulated parameter updates
+        # Average the accumulated parameter updates over the batch of episodes
+        num_episodes = len(episodes)
         with torch.no_grad():
-            for name, param in zip(param_names, param_list):
+            for name, param in zip(self.param_names, self.param_list):
+                # Average the parameter updates
+                delta_w_avg = self.delta_w_batch[name] / num_episodes
+
                 # Optionally, apply gradient clipping
                 if self.grad_clip is not None:
-                    delta_w = torch.clamp(
-                        delta_w_batch[name], -self.grad_clip, self.grad_clip
+                    delta_w_avg = torch.clamp(
+                        delta_w_avg, -self.grad_clip, self.grad_clip
                     )
-                else:
-                    delta_w = delta_w_batch[name]
-                param.add_(delta_w)
+
+                # Update parameters
+                param.add_(delta_w_avg)
 
         # Update learning rate if decay is set
         if self.lr_decay:
