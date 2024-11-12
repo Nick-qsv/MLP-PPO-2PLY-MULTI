@@ -45,137 +45,116 @@ class Trainer:
         # Initialize maximum GPU utilization tracker
         max_gpu_util = gpu_util_before.gpu
         max_mem_used = mem_info_before.used
+
         # Update the total episodes
         self.total_episodes += len(episodes)
 
-        # Collect experiences from episodes
-        observations = []
-        actions = []
-        action_log_probs = []
-        rewards = []
-        dones = []
-        state_values = []
-        next_state_values = []
-        advantages = []
+        # Collect parameters and names
+        param_list = [param for _, param in self.policy_network.named_parameters()]
+        param_names = [name for name, _ in self.policy_network.named_parameters()]
 
+        # Initialize accumulators for parameter updates
+        delta_w_batch = {
+            name: torch.zeros_like(param, device=self.device)
+            for name, param in zip(param_names, param_list)
+        }
+
+        # Loop over each episode
         for episode in episodes:
-            # For each episode, extract experiences
-            episode_observations = []
-            episode_actions = []
-            episode_action_log_probs = []
-            episode_rewards = []
-            episode_dones = []
-            episode_state_values = []
-            episode_next_state_values = []
+            experiences = episode.experiences
 
-            for experience in episode.experiences:
-                episode_observations.append(experience.observation)
-                episode_actions.append(experience.action)
-                episode_action_log_probs.append(experience.action_log_prob)
-                episode_rewards.append(experience.reward)
-                episode_dones.append(experience.done)
-                episode_state_values.append(experience.state_value)
-                episode_next_state_values.append(experience.next_state_value)
+            # Initialize eligibility traces for parameters
+            eligibility_traces = {
+                name: torch.zeros_like(param, device=self.device)
+                for name, param in zip(param_names, param_list)
+            }
 
-            # Compute GAE for this episode
-            gae = 0
-            episode_advantages = []
-            for i in reversed(range(len(episode_rewards))):
-                delta = (
-                    episode_rewards[i]
-                    + self.gamma * episode_next_state_values[i] * (1 - episode_dones[i])
-                    - episode_state_values[i]
-                )
-                gae = delta + self.gamma * self.lamda * (1 - episode_dones[i]) * gae
-                episode_advantages.insert(0, gae)
-                if episode_dones[i]:
-                    gae = 0
-            advantages.extend(episode_advantages)
+            # Collect all observations in the episode
+            observations = []
+            rewards = []
+            for experience in experiences:
+                x_t = experience.observation.to(self.device)
+                observations.append(x_t)
+                rewards.append(experience.reward.to(self.device))
 
-            # Append episode data to overall lists
-            observations.extend(episode_observations)
-            actions.extend(episode_actions)
-            action_log_probs.extend(episode_action_log_probs)
-            rewards.extend(episode_rewards)
-            dones.extend(episode_dones)
-            state_values.extend(episode_state_values)
-            next_state_values.extend(episode_next_state_values)
+            # Stack observations into a tensor
+            observations = torch.stack(observations)  # Shape: (seq_len, input_size)
+            rewards = torch.stack(rewards)  # Shape: (seq_len,)
 
-        # Convert lists to tensors
-        observations = torch.stack(observations).to(self.device)
-        actions = torch.tensor(actions).to(self.device)
-        action_log_probs = torch.stack(action_log_probs).to(self.device)
-        rewards = torch.tensor(rewards).to(self.device)
-        dones = torch.tensor(dones, dtype=torch.float32).to(self.device)
-        state_values = torch.stack(state_values).to(self.device)
-        next_state_values = torch.stack(next_state_values).to(self.device)
-        advantages = torch.tensor(advantages).to(self.device)
+            # Forward pass for all time steps in the episode
+            Y_values = self.policy_network(observations)  # Shape: (seq_len,)
 
-        # Normalize advantages
-        advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+            # Compute TD errors δ[t]
+            delta_values = []
+            for t in range(len(experiences)):
+                if t < len(experiences) - 1:
+                    delta_t = Y_values[t + 1].detach() - Y_values[t]
+                else:
+                    # Terminal state
+                    delta_t = rewards[t] - Y_values[t]
+                delta_values.append(delta_t)
 
-        old_action_log_probs = action_log_probs.detach()
+            # Process each time step to update eligibility traces and accumulate parameter updates
+            for t in range(len(experiences)):
+                # Zero gradients to prevent accumulation from previous iterations
+                self.policy_network.zero_grad()
 
-        # PPO policy update
-        for _ in range(self.K_epochs):
-            # Create mini-batches
-            for idx in range(0, len(observations), self.batch_size):
-                batch_indices = slice(idx, idx + self.batch_size)
-                batch_observations = observations[batch_indices]
-                batch_actions = actions[batch_indices]
-                batch_advantages = advantages[batch_indices]
-                batch_old_action_log_probs = old_action_log_probs[batch_indices]
-                batch_state_values = state_values[batch_indices]
+                # Compute gradient ∇Y[t] w.r.t parameters
+                Y_t = Y_values[t]
+                # Since Y_t is a scalar, gradients will be computed correctly
+                Y_t.backward(retain_graph=True)
 
-                # Evaluate current policy
-                logits, state_values_pred = self.policy_network(batch_observations)
-                state_values_pred = state_values_pred.squeeze(-1)
+                # Collect gradients
+                gradients = {
+                    name: (
+                        param.grad.clone()
+                        if param.grad is not None
+                        else torch.zeros_like(param)
+                    )
+                    for name, param in zip(param_names, param_list)
+                }
 
-                # Compute action probabilities
-                action_probs = F.softmax(logits, dim=-1)
-                dist = Categorical(action_probs)
+                # Update eligibility traces
+                for name in eligibility_traces:
+                    eligibility_traces[name] = (
+                        self.lamda * self.gamma * eligibility_traces[name]
+                        + gradients[name]
+                    )
 
-                # Compute entropy
-                entropy = dist.entropy().mean()
+                # Compute Δw[t] = α δ[t] e[t]
+                delta_t = delta_values[t]
+                for name in delta_w_batch:
+                    delta_w_t = self.alpha * delta_t * eligibility_traces[name]
+                    delta_w_batch[name] += delta_w_t
 
-                # Compute new action log probs
-                new_action_log_probs = dist.log_prob(batch_actions)
-
-                # Compute ratio
-                ratios = torch.exp(new_action_log_probs - batch_old_action_log_probs)
-
-                # Compute surrogate loss
-                surr1 = ratios * batch_advantages
-                surr2 = (
-                    torch.clamp(ratios, 1 - self.epsilon, 1 + self.epsilon)
-                    * batch_advantages
-                )
-                actor_loss = -torch.min(surr1, surr2).mean()
-
-                # Critic loss (value function loss)
-                critic_loss = F.mse_loss(state_values_pred, batch_state_values)
-
-                # Total loss
-                loss = (
-                    actor_loss
-                    + VALUE_LOSS_COEF * critic_loss
-                    - self.entropy_coef * entropy
-                )
-
-                # Backpropagation
-                self.optimizer.zero_grad()
-                loss.backward()
-                self.optimizer.step()
+                # Clear gradients after use
+                self.policy_network.zero_grad()
 
                 # Update maximum GPU utilization
-                torch.cuda.synchronize()
-                current_gpu_util = pynvml.nvmlDeviceGetUtilizationRates(self.gpu_handle)
-                current_mem_info = pynvml.nvmlDeviceGetMemoryInfo(self.gpu_handle)
-                max_gpu_util = max(max_gpu_util, current_gpu_util.gpu)
-                max_mem_used = max(max_mem_used, current_mem_info.used)
+                gpu_util_current = pynvml.nvmlDeviceGetUtilizationRates(self.gpu_handle)
+                mem_info_current = pynvml.nvmlDeviceGetMemoryInfo(self.gpu_handle)
+                max_gpu_util = max(max_gpu_util, gpu_util_current.gpu)
+                max_mem_used = max(max_mem_used, mem_info_current.used)
 
-        # After update, update entropy coefficient
-        self.update_entropy_coef()
+        # Apply the accumulated parameter updates
+        with torch.no_grad():
+            for name, param in zip(param_names, param_list):
+                # Optionally, apply gradient clipping
+                if self.grad_clip is not None:
+                    delta_w = torch.clamp(
+                        delta_w_batch[name], -self.grad_clip, self.grad_clip
+                    )
+                else:
+                    delta_w = delta_w_batch[name]
+                param.add_(delta_w)
+
+        # Update learning rate if decay is set
+        if self.lr_decay:
+            for param_group in self.optimizer.param_groups:
+                param_group["lr"] *= self.lr_decay ** (
+                    self.total_episodes / self.lr_decay_steps
+                )
+
         # After update, update parameters in parameter manager
         self.parameter_manager.set_parameters(self.policy_network.state_dict())
         self.parameter_manager.increment_version()
@@ -197,9 +176,3 @@ class Trainer:
         )
         print(f"  Max Utilization during Update: {max_gpu_util}%")
         print(f"  Max Memory Used during Update: {max_mem_used / (1024 ** 2):.2f} MB")
-
-    def update_entropy_coef(self):
-        progress = min(1.0, self.total_episodes / self.entropy_anneal_episodes)
-        self.entropy_coef = self.entropy_coef_start - progress * (
-            self.entropy_coef_start - self.entropy_coef_end
-        )
