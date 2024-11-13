@@ -217,7 +217,9 @@ class BackgammonEnv(gym.Env):
             return
 
         # Refactored: Truncate legal moves and board features
-        self.truncate_legal_moves_and_features(legal_board_features)
+        legal_board_features = self.truncate_legal_moves_and_features(
+            legal_board_features
+        )
 
         # Refactored: Update action_mask
         self.update_action_mask()
@@ -234,8 +236,8 @@ class BackgammonEnv(gym.Env):
             legal_board_features = legal_board_features[: self.max_legal_moves]
             self.legal_moves = self.legal_moves[: self.max_legal_moves]
             num_moves = self.max_legal_moves
-
         self.num_moves = num_moves
+        return legal_board_features
 
     def update_action_mask(self):
         """

@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import pynvml
 import time
+import gc
 from torch.distributions import Categorical
 from .policy_network import BackgammonPolicyNetwork
 from config import *
@@ -144,7 +145,12 @@ class Trainer:
 
                 # Compute gradient ∇Y[t] w.r.t parameters
                 Y_t = Y_values[t]
-                Y_t.backward(retain_graph=True)
+                if t != 0:
+                    Y_t.backward(
+                        retain_graph=True
+                    )  # Retain graph for subsequent backward passes
+                else:
+                    Y_t.backward()  # Do not retain on the last backward pass
 
                 # Collect gradients
                 gradients = {
@@ -203,7 +209,6 @@ class Trainer:
 
         # After update, update parameters in parameter manager
         self.parameter_manager.set_parameters(self.policy_network.state_dict())
-        self.parameter_manager.increment_version()
 
         end_time = time.time()
 
@@ -222,3 +227,8 @@ class Trainer:
         )
         print(f"  Max Utilization during Update: {max_gpu_util}%")
         print(f"  Max Memory Used during Update: {max_mem_used / (1024 ** 2):.2f} MB")
+
+        # Optionally, perform garbage collection and clear cache
+        del episodes
+        gc.collect()
+        torch.cuda.empty_cache()

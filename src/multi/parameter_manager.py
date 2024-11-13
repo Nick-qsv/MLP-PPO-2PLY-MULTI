@@ -67,14 +67,6 @@ class ParameterManager:
         """
         return self.version.value
 
-    def increment_version(self):
-        """
-        Safely increments the version number for synchronization between the trainer and workers.
-        Ensures thread-safe updates to the shared version value.
-        """
-        with self.lock:
-            self.version.value += 1
-
     def set_parameters(self, new_state_dict):
         """
         Updates the shared parameters with a new state_dict and increments the version number.
