@@ -162,18 +162,18 @@ class Trainer:
                     for name, param in zip(self.param_names, self.param_list)
                 }
 
-                # Update eligibility traces
+                # Update eligibility traces and detach
                 for name in eligibility_traces:
                     eligibility_traces[name] = (
                         self.lamda * self.gamma * eligibility_traces[name]
                         + gradients[name]
-                    )
+                    ).detach()
 
-                # Compute Δw[t] = α δ[t] e[t]
+                # Compute Δw[t] = α δ[t] e[t] and detach
                 delta_t = delta_values[t]
                 for name in self.delta_w_batch:
                     delta_w_t = self.alpha * delta_t * eligibility_traces[name]
-                    self.delta_w_batch[name] += delta_w_t
+                    self.delta_w_batch[name] += delta_w_t.detach()
 
                 # Clear gradients after use
                 self.policy_network.zero_grad()
@@ -227,8 +227,3 @@ class Trainer:
         )
         print(f"  Max Utilization during Update: {max_gpu_util}%")
         print(f"  Max Memory Used during Update: {max_mem_used / (1024 ** 2):.2f} MB")
-
-        # Optionally, perform garbage collection and clear cache
-        del episodes
-        gc.collect()
-        torch.cuda.empty_cache()
