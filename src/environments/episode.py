@@ -27,19 +27,23 @@ class Experience:
             elif val is not None and hasattr(val, "to_numpy"):
                 val.to_numpy()
 
-    def to_tensor(self):
+    def to_tensor(self, device=None):
         for attr in vars(self):
             val = getattr(self, attr)
             if isinstance(val, np.ndarray):
-                setattr(self, attr, torch.from_numpy(val))
+                setattr(self, attr, torch.from_numpy(val).to(device))
             elif isinstance(val, float):
-                setattr(self, attr, torch.tensor(val, dtype=torch.float32))
+                setattr(
+                    self, attr, torch.tensor(val, dtype=torch.float32, device=device)
+                )
             elif isinstance(val, int):
-                setattr(self, attr, torch.tensor(val, dtype=torch.int64))
+                setattr(self, attr, torch.tensor(val, dtype=torch.int64, device=device))
             elif isinstance(val, bool):
-                setattr(self, attr, torch.tensor(val, dtype=torch.bool))
+                setattr(self, attr, torch.tensor(val, dtype=torch.bool, device=device))
+            elif isinstance(val, torch.Tensor) and device is not None:
+                setattr(self, attr, val.to(device))
             elif val is not None and hasattr(val, "to_tensor"):
-                val.to_tensor()
+                val.to_tensor(device=device)
 
 
 class Episode:
@@ -53,6 +57,6 @@ class Episode:
         for experience in self.experiences:
             experience.to_numpy()
 
-    def to_tensor(self):
+    def to_tensor(self, device=None):
         for experience in self.experiences:
-            experience.to_tensor()
+            experience.to_tensor(device=device)

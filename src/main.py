@@ -114,9 +114,9 @@ def main():
     trainer = Trainer(parameter_manager=parameter_manager)
 
     # Device setup for GPU
-    trainer.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using device: {trainer.device}")
-    trainer.policy_network.to(trainer.device)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
+    trainer.policy_network.to(device)
 
     # Initialize trainer's state
     state_dict = parameter_manager.get_parameters()
@@ -132,9 +132,6 @@ def main():
         # Try to get episodes from the ExperienceQueue
         try:
             episode = experience_queue.get(timeout=1)
-            # **Convert NumPy arrays back to tensors**
-            episode.to_tensor()
-
             replay_buffer.add_episode(episode)
             episode_count += 1
             print(f"Episode count incremented to: {episode_count}")  # Debug statement
@@ -145,7 +142,11 @@ def main():
                 # Drain the buffer and push episodes to the Trainer
                 episodes_to_train = list(replay_buffer.buffer)
                 replay_buffer.buffer.clear()
-                # Perform training directly
+                # Convert episodes to tensors on the GPU
+                for episode in episodes_to_train:
+                    episode.to_tensor(device=device)
+
+                # Perform training
                 trainer.update(episodes_to_train)
 
         except queue.Empty:

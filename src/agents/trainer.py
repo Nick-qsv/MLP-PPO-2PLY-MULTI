@@ -108,9 +108,9 @@ class Trainer:
             observations = []
             rewards = []
             for experience in experiences:
-                x_t = torch.from_numpy(experience.observation).to(self.device)
+                x_t = experience.observation  # Tensors are already on the GPU
                 observations.append(x_t)
-                rewards.append(torch.tensor(experience.reward, device=self.device))
+                rewards.append(experience.reward)
 
             # Stack observations and rewards into tensors
             observations = torch.stack(observations)  # Shape: (seq_len, input_size)
