@@ -13,9 +13,9 @@ S3_LOG_PREFIX = "logs/"
 
 # Hyperparameters
 GAMMA = 0.99
-LAMBDA = 0.90
+LAMBDA = 0.99
 LEARNING_RATE = 1e-3
-GRAD_CLIP_THRESHOLD = 0.5  # Gradient clipping threshold
+GRAD_CLIP_THRESHOLD = 1.0  # Gradient clipping threshold
 LR_DECAY = 0.99  # Learning rate decay
 LR_DECAY_STEPS = 100_000  # Number of steps over which to decay learning rate
 

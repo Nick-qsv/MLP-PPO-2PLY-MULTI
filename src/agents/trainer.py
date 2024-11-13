@@ -17,15 +17,18 @@ class Trainer:
         self.policy_network = BackgammonPolicyNetwork().to(self.device)
         # Load initial parameters from parameter manager
         state_dict = self.parameter_manager.get_parameters()
+        # Move state_dict tensors to self.device
+        state_dict = {k: v.to(self.device) for k, v in state_dict.items()}
         self.policy_network.load_state_dict(state_dict)
         self.optimizer = torch.optim.Adam(
             self.policy_network.parameters(), lr=LEARNING_RATE
         )
 
         # Hyperparameters
-        self.gamma = GAMMA
-        self.lamda = LAMBDA
-        self.alpha = LEARNING_RATE
+        self.gamma = torch.tensor(GAMMA, device=self.device)
+        self.lamda = torch.tensor(LAMBDA, device=self.device)
+        self.alpha = torch.tensor(LEARNING_RATE, device=self.device)
+
         self.total_episodes = 0
         self.grad_clip = GRAD_CLIP_THRESHOLD
         self.lr_decay = LR_DECAY
