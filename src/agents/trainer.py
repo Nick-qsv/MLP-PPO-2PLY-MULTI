@@ -97,6 +97,8 @@ class Trainer:
         max_gpu_util = gpu_util_before.gpu
         max_mem_used = mem_info_before.used
 
+        # Inside your update function, before the problematic operation
+
         # Update the total episodes
         self.total_episodes += len(episodes)
 

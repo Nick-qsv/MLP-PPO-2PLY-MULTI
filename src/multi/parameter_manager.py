@@ -42,9 +42,12 @@ class ParameterManager:
         self.s3_bucket_name = S3_BUCKET_NAME
         self.s3_model_prefix = S3_MODEL_PREFIX
 
-    def get_parameters(self):
+    def get_parameters(self, device=None):
         """
         Retrieves the current state_dict of parameters.
+
+        Args:
+            device (torch.device, optional): The device to move the parameters to.
 
         Returns:
             dict: A state_dict with parameter names as keys and tensors as values.
@@ -52,7 +55,7 @@ class ParameterManager:
         # Reconstruct the state_dict from stored NumPy arrays
         state_dict = {}
         for key, array in self.parameters.items():
-            state_dict[key] = torch.tensor(array)
+            state_dict[key] = torch.tensor(array, device=device)
         return state_dict
 
     def get_version(self):

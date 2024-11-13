@@ -110,13 +110,11 @@ def main():
         worker_process.start()
         worker_processes.append(worker_process)
 
-    # Initialize Trainer (no separate process)
-    trainer = Trainer(parameter_manager=parameter_manager)
-
     # Device setup for GPU
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
-    trainer.policy_network.to(device)
+    # Initialize Trainer (no separate process)
+    trainer = Trainer(parameter_manager=parameter_manager, device=device)
 
     # Initialize trainer's state
     state_dict = parameter_manager.get_parameters()
