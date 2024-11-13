@@ -83,21 +83,21 @@ class Worker:
         episode = Episode()
         observation = env.reset()
 
-        # Initialize profiling dictionary
-        profiling_data = {}
+        # # Initialize profiling dictionary
+        # profiling_data = {}
 
-        def start_timer(key):
-            profiling_data[key] = profiling_data.get(
-                key, {"total_time": 0.0, "call_count": 0}
-            )
-            profiling_data[key]["start_time"] = time.perf_counter()
+        # def start_timer(key):
+        #     profiling_data[key] = profiling_data.get(
+        #         key, {"total_time": 0.0, "call_count": 0}
+        #     )
+        #     profiling_data[key]["start_time"] = time.perf_counter()
 
-        def end_timer(key):
-            end_time = time.perf_counter()
-            profiling_data[key]["total_time"] += (
-                end_time - profiling_data[key]["start_time"]
-            )
-            profiling_data[key]["call_count"] += 1
+        # def end_timer(key):
+        #     end_time = time.perf_counter()
+        #     profiling_data[key]["total_time"] += (
+        #         end_time - profiling_data[key]["start_time"]
+        #     )
+        #     profiling_data[key]["call_count"] += 1
 
         done = False
         step_count = 0
@@ -109,9 +109,9 @@ class Worker:
             # Handle the case where there are no legal moves
             if num_moves == 0:
                 # No legal moves, take a no-op action (pass turn)
-                start_timer("Env Step (No Action)")
+                # start_timer("Env Step (No Action)")
                 next_observation, reward, done, info = env.step(None)
-                end_timer("Env Step (No Action)")
+                # end_timer("Env Step (No Action)")
 
                 # Move to next observation
                 observation = next_observation
@@ -127,10 +127,10 @@ class Worker:
             )  # Shape: (num_moves + 1, 198)
 
             # Perform a forward pass using forward_combined
-            start_timer("Policy Network Forward Pass on Actions")
+            # start_timer("Policy Network Forward Pass on Actions")
             with torch.no_grad():
                 state_values = self.policy_network.forward(x)
-            end_timer("Policy Network Forward Pass on Actions")
+            # end_timer("Policy Network Forward Pass on Actions")
             # Extract state values
             original_state_value = state_values[
                 0
@@ -140,7 +140,7 @@ class Worker:
             ]  # State values for resulting states (num_moves,)
 
             # Softmax-Based Action Selection
-            start_timer("Softmax-Based Action Selection")
+            # start_timer("Softmax-Based Action Selection")
 
             # Convert state values to a probability distribution using softmax
             temperature = (
@@ -154,12 +154,12 @@ class Worker:
             m = torch.distributions.Categorical(probs=action_probs)
             action_idx = m.sample().item()
 
-            end_timer("Softmax-Based Action Selection")
+            # end_timer("Softmax-Based Action Selection")
 
             # Take action in env
-            start_timer("Env Step")
+            # start_timer("Env Step")
             next_observation, reward, done, info = env.step(action_idx)
-            end_timer("Env Step")
+            # end_timer("Env Step")
 
             # Create and add Experience
             experience = Experience(
@@ -183,15 +183,15 @@ class Worker:
         # Convert tensors to NumPy arrays before returning the episode
         episode.to_numpy()
 
-        # Print profiling data
-        print(f"\nWorker {self.worker_id} profiling data for this episode:")
-        for func_name, data in profiling_data.items():
-            total_time = data["total_time"]
-            call_count = data["call_count"]
-            avg_time = total_time / call_count if call_count else 0
-            print(
-                f"{func_name}: Total Time = {total_time:.6f}s, Calls = {call_count}, Average Time = {avg_time:.6f}s"
-            )
+        # # Print profiling data
+        # print(f"\nWorker {self.worker_id} profiling data for this episode:")
+        # for func_name, data in profiling_data.items():
+        #     total_time = data["total_time"]
+        #     call_count = data["call_count"]
+        #     avg_time = total_time / call_count if call_count else 0
+        #     print(
+        #         f"{func_name}: Total Time = {total_time:.6f}s, Calls = {call_count}, Average Time = {avg_time:.6f}s"
+        #     )
 
         return episode
 
