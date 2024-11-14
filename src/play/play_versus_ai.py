@@ -1,4 +1,12 @@
-from environments.backgammon_env import BackgammonEnv
+import sys
+import os
+
+# Get the absolute path to the project root
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+# Add the `src` directory to the system path
+sys.path.append(os.path.join(project_root, "src"))
+
+from environments import BackgammonEnv
 from agents.policy_network import BackgammonPolicyNetwork
 from play.game_renderer import render
 from backgammon.types import Player
@@ -9,11 +17,20 @@ def play_game():
     done = False
     env = BackgammonEnv()
     policy_network = BackgammonPolicyNetwork()
+    path = os.path.join(project_root, "src/play", "backgammon_mlp_episode_340000.pth")
+    try:
+        policy_network.load_state_dict(
+            torch.load(path, map_location=torch.device("cpu"))
+        )
+        print(f"Loaded model from {path}")
+    except Exception as e:
+        print(f"Failed to load model from {path}: {e}")
+
     env.reset()
     human_player = Player.PLAYER1
     while not done:
         if env.current_player == human_player:
-            render(env, human_player)
+            render(env.board, human_player)
             print("Your turn:")
             if len(env.legal_moves) == 0:
                 # No legal moves, automatically pass the turn
@@ -56,8 +73,8 @@ def human_play_step(env):
     for i, move in enumerate(legal_moves):
         # Generate the description for each SubMove
         moves_description = ", ".join(
-            f"[{'bar' if sub_move.start_index == -1 else sub_move.start_index}, "
-            f"{'off' if sub_move.end_index == -2 else sub_move.end_index}, "
+            f"[{'bar' if sub_move.start == -1 else sub_move.start}, "
+            f"{'off' if sub_move.end == -2 else sub_move.end}, "
             f"{'*' if sub_move.hits_blot else '-'}]"
             for sub_move in move.sub_move_commands
         )
@@ -91,8 +108,8 @@ def agent_play_step(policy_network, env):
 
     # Generate a descriptive string for the selected move
     moves_description = ", ".join(
-        f"[{'bar' if sub_move.start_index == -1 else sub_move.start_index}, "
-        f"{'off' if sub_move.end_index == -2 else sub_move.end_index}, "
+        f"[{'bar' if sub_move.start == -1 else sub_move.start}, "
+        f"{'off' if sub_move.end == -2 else sub_move.end}, "
         f"{'*' if sub_move.hits_blot else '-'}]"
         for sub_move in selected_move.sub_move_commands
     )
@@ -107,11 +124,11 @@ def select_highest_value_action(policy_network, x):
     with torch.no_grad():
         state_values = policy_network.forward(x)
 
-    # Extract original state value (first value)
-    original_state_value = state_values[0].item()
-
     # Extract action state values (remaining values)
-    action_state_values = state_values[1:]  # Shape: (num_moves,)
+    if state_values.dim() == 0:
+        action_state_values = state_values  # scalar case
+    else:
+        action_state_values = state_values[1:]  # usual slicing if it's 1D or higher
 
     # Get the index of the action with the maximum state value
     action_idx = torch.argmax(
@@ -122,4 +139,5 @@ def select_highest_value_action(policy_network, x):
 
 
 if __name__ == "__main__":
+    print(sys.path)
     play_game()
