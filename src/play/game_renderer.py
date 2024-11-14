@@ -43,7 +43,9 @@ def render(board: ImmutableBoard, human_player: Player, mode: str = "human") -> 
     ), "Color split error: colors count mismatch."
 
     # Print the board headers
-    print("| 12 | 13 | 14 | 15 | 16 | 17 | BAR | 18 | 19 | 20 | 21 | 22 | 23 | OFF |")
+    print(
+        "| 12   | 13  | 14  | 15  | 16  | 17  | BAR | 18  | 19  | 20  | 21  | 22  | 23  | OFF |"
+    )
     print(
         f"|------------Outer Board-------------|     |-----------P={TOKEN.get(ai_player, '?')} Home Board----------|     |"
     )
@@ -73,7 +75,9 @@ def render(board: ImmutableBoard, human_player: Player, mode: str = "human") -> 
     print(
         f"|------------Outer Board-------------|     |-----------P={TOKEN.get(human_player, '?')} Home Board----------|     |"
     )
-    print("| 11 | 10 | 9  | 8  | 7  | 6  | BAR | 5  | 4  | 3  | 2  | 1  | 0  | OFF |\n")
+    print(
+        "| 11   | 10  | 9   | 8   | 7   | 6   | BAR | 5   | 4   | 3   | 2   | 1   | 0   | OFF |\n"
+    )
 
 
 def print_half_board(
