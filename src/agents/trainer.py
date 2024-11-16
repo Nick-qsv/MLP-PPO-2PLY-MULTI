@@ -1,10 +1,7 @@
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 import pynvml
 import time
-import gc
-from torch.distributions import Categorical
 from .policy_network import BackgammonPolicyNetwork
 from config import *
 
