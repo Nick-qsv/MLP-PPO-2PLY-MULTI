@@ -118,11 +118,11 @@ class Trainer:
             max_mem_used = max(max_mem_used, mem_info_current.used)
 
         # Update learning rate if decay is set
-        if self.lr_decay:
-            for param_group in self.optimizer.param_groups:
-                param_group["lr"] *= self.lr_decay ** (
-                    self.total_episodes / self.lr_decay_steps
-                )
+        # if self.lr_decay:
+        #     for param_group in self.optimizer.param_groups:
+        #         param_group["lr"] *= self.lr_decay ** (
+        #             self.total_episodes / self.lr_decay_steps
+        #         )
 
         # After update, update parameters in parameter manager
         self.parameter_manager.set_parameters(self.policy_network.state_dict())
@@ -254,11 +254,11 @@ class Trainer:
         average_episode_length = total_episode_length / batch_size
 
         # Update learning rate if decay is set
-        if self.lr_decay:
-            for param_group in self.optimizer.param_groups:
-                param_group["lr"] *= self.lr_decay ** (
-                    self.total_episodes / self.lr_decay_steps
-                )
+        # if self.lr_decay:
+        #     for param_group in self.optimizer.param_groups:
+        #         param_group["lr"] *= self.lr_decay ** (
+        #             self.total_episodes / self.lr_decay_steps
+        #         )
 
         # After update, update parameters in parameter manager
         self.parameter_manager.set_parameters(self.policy_network.state_dict())
