@@ -7,23 +7,6 @@ import time
 import torch
 import queue
 import pynvml
-import shutil
-
-
-def print_disk_usage():
-    total, used, free = shutil.disk_usage("/")
-    print("*******Disk Space Usage:*******")
-    print(f"Total: {total / (1024**3):.2f} GB")
-    print(f"Used: {used / (1024**3):.2f} GB")
-    print(f"Free: {free / (1024**3):.2f} GB")
-
-
-def print_shared_memory_usage():
-    total, used, free = shutil.disk_usage("/dev/shm")
-    print("*******Shared Memory Usage:*******")
-    print(f"Total: {total / (1024**3):.2f} GB")
-    print(f"Used: {used / (1024**3):.2f} GB")
-    print(f"Free: {free / (1024**3):.2f} GB")
 
 
 def main():
@@ -114,7 +97,12 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
     # Initialize Trainer (no separate process)
-    trainer = Trainer(parameter_manager=parameter_manager, device=device)
+    trainer = Trainer(
+        parameter_manager=parameter_manager,
+        device=device,
+        s3_bucket_name=S3_BUCKET_NAME,
+        s3_log_prefix=S3_LOG_PREFIX,
+    )
 
     # Initialize trainer's state
     state_dict = parameter_manager.get_parameters()
