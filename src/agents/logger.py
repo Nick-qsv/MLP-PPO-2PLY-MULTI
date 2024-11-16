@@ -6,7 +6,6 @@ from datetime import datetime
 import tensorboardX
 
 
-# Create the S3Logger class
 class S3Logger:
     def __init__(self, log_dir=None, s3_bucket_name=None, s3_log_prefix="logs/"):
         # Save the original RecordWriter
