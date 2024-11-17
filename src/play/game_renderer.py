@@ -88,14 +88,11 @@ def print_half_board(
     TOKEN: dict,
     reversed_: bool = False,
 ) -> None:
-    # Map player to index in bar and borne_off tuples
-    player_index = player.value - 1  # Assuming Player.PLAYER1 = 1, PLAYER2 = 2
-
     # Determine the maximum number of checkers in this half-board, bar, or borne_off
     max_half = max(half_board) if half_board else 0
-    bar_count = board.bar[player_index]
-    borne_off_count = board.borne_off[player_index]
-    max_length = max(max_half, bar_count, borne_off_count)
+    bar_counts = board.bar
+    borne_off_counts = board.borne_off
+    max_length = max(max_half, sum(bar_counts), sum(borne_off_counts))
 
     # Start printing rows for the current half of the board
     for i in range(max_length):
@@ -107,9 +104,21 @@ def print_half_board(
             else:
                 row.append(" ")
 
-        # Bar and Off sections
-        bar = f"{TOKEN[player]} " if bar_count > i else "  "
-        off = f"{TOKEN[player]} " if borne_off_count > i else "  "
+        # Bar section
+        bar_tokens = []
+        if bar_counts[0] > i:
+            bar_tokens.append(TOKEN[Player.PLAYER1])
+        if bar_counts[1] > i:
+            bar_tokens.append(TOKEN[Player.PLAYER2])
+        bar = "".join(bar_tokens) if bar_tokens else "  "
+
+        # Off section
+        off_tokens = []
+        if borne_off_counts[0] > i:
+            off_tokens.append(TOKEN[Player.PLAYER1])
+        if borne_off_counts[1] > i:
+            off_tokens.append(TOKEN[Player.PLAYER2])
+        off = "".join(off_tokens) if off_tokens else "  "
 
         # Construct the full row with properly aligned columns
         row_display = (
