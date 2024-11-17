@@ -126,8 +126,8 @@ def main():
                 )  # Debug statement
             # print_disk_usage()
             # print_shared_memory_usage()
-            # Check if replay_buffer has reached 1,000 episodes
-            if len(replay_buffer.buffer) >= 100:
+            # Check if replay_buffer has reached x episodes
+            if len(replay_buffer.buffer) >= MIN_EPISODES_TO_TRAIN:
                 # Drain the buffer and push episodes to the Trainer
                 episodes_to_train = list(replay_buffer.buffer)
                 replay_buffer.buffer.clear()
@@ -143,19 +143,21 @@ def main():
             print("Experience queue is empty. Waiting for episodes...")
             pass
 
-        if episode_count % 100 == 0 and episode_count != 0:
+        if episode_count % 1000 == 0 and episode_count != 0:
             current_time = time.time()
             elapsed = current_time - last_print_time
-            eps_per_sec = 100 / elapsed if elapsed > 0 else float("inf")
-            print(f"Episode {episode_count} completed | {eps_per_sec:.2f} eps/sec")
+            eps_per_sec = 1000 / elapsed if elapsed > 0 else float("inf")
+            print(
+                f"***** Episode {episode_count} completed | {eps_per_sec:.2f} eps/sec ****"
+            )
             last_print_time = current_time
 
         # Test save to make sure S3 working
-        if episode_count == 100:
-            print(f"Saving model at episode {episode_count}")
-            filename = f"backgammon_mlp_episode_{episode_count}.pth"
-            # Save model via ParameterManager
-            parameter_manager.save_model(filename=filename, to_s3=True)
+        # if episode_count == 100:
+        #     print(f"Saving model at episode {episode_count}")
+        #     filename = f"backgammon_mlp_episode_{episode_count}.pth"
+        #     # Save model via ParameterManager
+        #     parameter_manager.save_model(filename=filename, to_s3=True)
 
         # Check if it's time to save the model
         if episode_count % MODEL_SAVE_FREQUENCY == 0 and episode_count != 0:
