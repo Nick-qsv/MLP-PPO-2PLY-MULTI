@@ -163,5 +163,84 @@ def check_for_backgammon(board: ImmutableBoard, player: Player) -> bool:
     return False  # No checkers in home board or on the bar
 
 
+# Include the helper functions
+def made_at_least_five_prime(board: ImmutableBoard, player: Player) -> bool:
+
+    # Get the player's and opponent's positions
+    if player == Player.PLAYER1:
+        player_positions = board.positions_0
+        opponent_positions = board.positions_1
+        # Player 1 moves from point 0 to 23
+        indices = range(0, 24)
+        direction = 1
+    else:
+        player_positions = board.positions_1
+        opponent_positions = board.positions_0
+        # Player 2 moves from point 23 to 0
+        indices = range(23, -1, -1)
+        direction = -1
+
+    current_prime_length = 0
+
+    for idx in indices:
+        if player_positions[idx] >= 2:
+            current_prime_length += 1
+        else:
+            current_prime_length = 0
+
+        if current_prime_length >= 5:
+            # Potential 5-prime or 6-prime detected
+
+            if direction == 1:
+                # For Player 1, prime starts from idx - (current_prime_length - 1) to idx
+                prime_start = idx - (current_prime_length - 1)
+                prime_end = idx
+                # Opponent's checkers behind the prime are on points after prime_end
+                behind_indices = range(prime_end + 1, 24)
+            else:
+                # For Player 2, prime starts from idx to idx + (current_prime_length - 1)
+                prime_start = idx
+                prime_end = idx + (current_prime_length - 1)
+                # Opponent's checkers behind the prime are on points before prime_start
+                behind_indices = range(0, prime_start)
+
+            # Check if the opponent has any checkers behind the prime
+            opponent_has_checkers_behind = any(
+                opponent_positions[i] > 0 for i in behind_indices
+            )
+
+            if opponent_has_checkers_behind:
+                return True
+
+    return False
+
+
+def is_closed_out(board: ImmutableBoard, player: Player) -> bool:
+    opponent = get_opponent(player)
+
+    # Check if the opponent has any checkers on the bar
+    opponent_bar = board.bar[opponent]
+    if opponent_bar == 0:
+        # Opponent is not on the bar, cannot be closed out
+        return False
+
+    # Define the home board indices for the current player
+    if player == Player.PLAYER1:
+        home_board_indices = range(18, 24)  # Points 18-23
+        positions = board.positions_0
+    else:
+        home_board_indices = range(0, 6)  # Points 0-5
+        positions = board.positions_1
+
+    # Check if all points in the player's home board have at least 2 checkers
+    for idx in home_board_indices:
+        if positions[idx] < 2:
+            # The point is not made (does not have at least 2 checkers)
+            return False
+
+    # All points in the home board are made, and the opponent has checkers on the bar
+    return True
+
+
 def get_opponent(player: Player) -> Player:
     return Player.PLAYER2 if player == Player.PLAYER1 else Player.PLAYER1

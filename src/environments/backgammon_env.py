@@ -12,14 +12,18 @@ from .env_helper import (
     check_for_gammon,
     check_for_backgammon,
     generate_all_board_features,
+    is_closed_out,
+    made_at_least_five_prime,
 )
 import time
 
 REWARD_PASS = 0.0
 REWARD_INVALID_ACTION = -1.0
 REWARD_WIN_BACKGAMMON = 2.0
-REWARD_WIN_GAMMON = 1.5
+REWARD_WIN_GAMMON = 2.0
 REWARD_WIN_NORMAL = 1.0
+REWARD_CLOSE_OUT = 0.36
+REWARD_MAKE_PRIME = 0.24
 
 
 class BackgammonEnv(gym.Env):
@@ -82,6 +86,16 @@ class BackgammonEnv(gym.Env):
         self.worker_id = worker_id
         self.profiling_data = {}
 
+        # Initialize reward tracking flags for each player
+        self.close_out_reward_given = {
+            Player.PLAYER1: False,
+            Player.PLAYER2: False,
+        }
+        self.prime_reward_given = {
+            Player.PLAYER1: False,
+            Player.PLAYER2: False,
+        }
+
     def reset(self):
 
         if self.match_over:
@@ -116,6 +130,16 @@ class BackgammonEnv(gym.Env):
 
         # Update legal moves and board features based on the first non-doubles roll
         self.update_legal_moves()
+
+        # Reset reward tracking flags for the new game
+        self.close_out_reward_given = {
+            Player.PLAYER1: False,
+            Player.PLAYER2: False,
+        }
+        self.prime_reward_given = {
+            Player.PLAYER1: False,
+            Player.PLAYER2: False,
+        }
 
         observation = self.get_observation()
         return observation
@@ -154,7 +178,11 @@ class BackgammonEnv(gym.Env):
         # Update the board using setter method
         self.set_board(execute_full_move_on_board_copy(self.board, selected_move))
 
+        # Initialize reward to zero
+        reward = torch.tensor(0.0, device=self.device)
+
         if check_game_over(self.board, self.current_player):
+            # Process game over rewards
             is_backgammon = check_for_backgammon(self.board, self.current_player)
             is_gammon = False
             if not is_backgammon:
@@ -179,11 +207,27 @@ class BackgammonEnv(gym.Env):
                 self.current_match_winner = self.current_player
                 self.match_over = True
         else:
-            reward = torch.tensor(0.0, device=self.device)
+            # Game not over, check for close-out and prime
+            # Check for close out
+            if (
+                is_closed_out(self.board, self.current_player)
+                and not self.close_out_reward_given[self.current_player]
+            ):
+                reward += torch.tensor(REWARD_CLOSE_OUT, device=self.device)
+                self.close_out_reward_given[self.current_player] = True
+
+            # Check for making at least a 5-prime
+            if (
+                made_at_least_five_prime(self.board, self.current_player)
+                and not self.prime_reward_given[self.current_player]
+            ):
+                reward += torch.tensor(REWARD_MAKE_PRIME, device=self.device)
+                self.prime_reward_given[self.current_player] = True
+
             done = False
             self.pass_turn()
             self.roll_dice()
-            self.profile_call(self.update_legal_moves)
+            self.update_legal_moves()
 
         observation = self.get_observation()
         return observation, reward, done, info
