@@ -86,6 +86,8 @@ class BackgammonEnv(gym.Env):
         self.worker_id = worker_id
         self.profiling_data = {}
 
+        self.win_type = None
+
         # Initialize reward tracking flags for each player
         self.close_out_reward_given = {
             Player.PLAYER1: False,
@@ -106,6 +108,7 @@ class BackgammonEnv(gym.Env):
         # Reset the board using setter method
         self.set_board(ImmutableBoard.initial_board())
         self.game_over = False
+        self.win_type = None
 
         # Alternate starting player using setter method
         self.set_current_player(
@@ -185,20 +188,31 @@ class BackgammonEnv(gym.Env):
             # Process game over rewards
             is_backgammon = check_for_backgammon(self.board, self.current_player)
             is_gammon = False
-            if not is_backgammon:
-                is_gammon = check_for_gammon(self.board, self.current_player)
+            win_type = "regular"  # Default win type
 
             if is_backgammon:
                 game_score = 3
                 reward = torch.tensor(REWARD_WIN_BACKGAMMON, device=self.device)
-            elif is_gammon:
-                game_score = 2
-                reward = torch.tensor(REWARD_WIN_GAMMON, device=self.device)
+                win_type = "backgammon"
             else:
-                game_score = 1
-                reward = torch.tensor(REWARD_WIN_NORMAL, device=self.device)
+                is_gammon = check_for_gammon(self.board, self.current_player)
+                if is_gammon:
+                    game_score = 2
+                    reward = torch.tensor(REWARD_WIN_GAMMON, device=self.device)
+                    win_type = "gammon"
+                else:
+                    game_score = 1
+                    reward = torch.tensor(REWARD_WIN_NORMAL, device=self.device)
 
-            info.update({"winner": self.current_player, "game_score": game_score})
+            info.update(
+                {
+                    "winner": self.current_player,
+                    "game_score": game_score,
+                    "win_type": win_type,  # Include win type in info
+                }
+            )
+            self.win_type = win_type  # Set the win_type attribute
+
             self.player_scores[self.current_player] += game_score
             self.game_over = True
             done = True
