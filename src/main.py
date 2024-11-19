@@ -86,7 +86,7 @@ def main():
 
     # Create and start worker processes
     worker_processes = []
-    for i in range(31):
+    for i in range(25):
         worker_process = multiprocessing.Process(
             target=worker_function, args=(i, parameter_manager, experience_queue)
         )
@@ -117,13 +117,16 @@ def main():
     while episode_count < NUM_EPISODES:
         # Try to get episodes from the ExperienceQueue
         try:
-            episode = experience_queue.get(timeout=1)
-            replay_buffer.add_episode(episode)
-            episode_count += 1
-            if episode_count % 20 == 0 and episode_count != 0:
-                print(
-                    f"Episode count incremented to: {episode_count}"
-                )  # Debug statement
+            episodes = experience_queue.get(
+                timeout=1
+            )  # Now expecting a list of episodes
+            for episode in episodes:
+                replay_buffer.add_episode(episode)
+                episode_count += 1
+                if episode_count % 100 == 0 and episode_count != 0:
+                    print(
+                        f"Episode count incremented to: {episode_count}"
+                    )  # Debug statement
 
             # Check if replay_buffer has reached x episodes
             if len(replay_buffer.buffer) >= MIN_EPISODES_TO_TRAIN:
@@ -151,6 +154,13 @@ def main():
             )
             last_print_time = current_time
 
+        # Test save to make sure S3 working
+        if episode_count == 100:
+            print(f"Saving model at episode {episode_count}")
+            filename = f"backgammon_mlp_episode_{episode_count}.pth"
+            # Save model via ParameterManager
+            parameter_manager.save_model(filename=filename, to_s3=True)
+
         # Check if it's time to save the model
         if episode_count % MODEL_SAVE_FREQUENCY == 0 and episode_count != 0:
             filename = f"backgammon_mlp_episode_{episode_count}.pth"
@@ -171,9 +181,3 @@ if __name__ == "__main__":
         # Start method has already been set
         pass
     main()
-    # Test save to make sure S3 working
-    # if episode_count == 100:
-    #     print(f"Saving model at episode {episode_count}")
-    #     filename = f"backgammon_mlp_episode_{episode_count}.pth"
-    #     # Save model via ParameterManager
-    #     parameter_manager.save_model(filename=filename, to_s3=True)

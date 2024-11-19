@@ -9,7 +9,6 @@ import torch.autograd.profiler as profiler
 import random
 
 
-# about to change to TD from PPO
 class Worker:
     """
     Worker class that runs episodes of Backgammon games using a local copy of the PolicyNetwork.
@@ -27,7 +26,6 @@ class Worker:
             worker_id (int): Unique identifier for the worker.
             parameter_manager (ParameterManager): Shared ParameterManager instance.
             experience_queue (ExperienceQueue): Shared queue for storing episodes.
-            device (torch.device, optional): Device to run computations on. Defaults to CPU.
         """
         self.worker_id = worker_id
         self.parameter_manager = parameter_manager
@@ -46,13 +44,20 @@ class Worker:
         # Create environment
         env = BackgammonEnv(worker_id=self.worker_id, device=self.device)
         print(f"Worker {self.worker_id} starting.")
+
+        episodes = []  # List to collect episodes
+
         while True:
             # Play an episode
             episode = self.play_episode(env)
+            episodes.append(episode)
 
-            # Put the episode into the ExperienceQueue
-            self.experience_queue.put(episode)
-            # print(f"Worker {self.worker_id} added an episode to the queue.")
+            # If we have collected 10 episodes, put them into the queue
+            if len(episodes) == 10:
+                self.experience_queue.put(episodes)
+                # Reset the episodes list
+                episodes = []
+
             # At the end of the episode, check for updated parameters
             new_version = self.parameter_manager.get_version()
             if new_version > self.current_version:
@@ -80,24 +85,12 @@ class Worker:
             - Profiles the execution time of key operations and prints profiling data after the episode.
             - Handles cases with no legal moves by taking a no-op action.
         """
+        import time
+
+        start_time = time.time()
+
         episode = Episode()
         observation = env.reset()
-
-        # # Initialize profiling dictionary
-        # profiling_data = {}
-
-        # def start_timer(key):
-        #     profiling_data[key] = profiling_data.get(
-        #         key, {"total_time": 0.0, "call_count": 0}
-        #     )
-        #     profiling_data[key]["start_time"] = time.perf_counter()
-
-        # def end_timer(key):
-        #     end_time = time.perf_counter()
-        #     profiling_data[key]["total_time"] += (
-        #         end_time - profiling_data[key]["start_time"]
-        #     )
-        #     profiling_data[key]["call_count"] += 1
 
         done = False
         step_count = 0
@@ -109,9 +102,7 @@ class Worker:
             # Handle the case where there are no legal moves
             if num_moves == 0:
                 # No legal moves, take a no-op action (pass turn)
-                # start_timer("Env Step (No Action)")
                 next_observation, reward, done, info = env.step(None)
-                # end_timer("Env Step (No Action)")
 
                 # Move to next observation
                 observation = next_observation
@@ -127,10 +118,9 @@ class Worker:
             )  # Shape: (num_moves + 1, 198)
 
             # Perform a forward pass using forward_combined
-            # start_timer("Policy Network Forward Pass on Actions")
             with torch.no_grad():
                 state_values = self.policy_network.forward(x)
-            # end_timer("Policy Network Forward Pass on Actions")
+
             # Extract state values
             original_state_value = state_values[
                 0
@@ -140,7 +130,6 @@ class Worker:
             ]  # State values for resulting states (num_moves,)
 
             # Softmax-Based Action Selection
-            # start_timer("Softmax-Based Action Selection")
 
             # Convert state values to a probability distribution using softmax
             temperature = (
@@ -154,12 +143,8 @@ class Worker:
             m = torch.distributions.Categorical(probs=action_probs)
             action_idx = m.sample().item()
 
-            # end_timer("Softmax-Based Action Selection")
-
             # Take action in env
-            # start_timer("Env Step")
             next_observation, reward, done, info = env.step(action_idx)
-            # end_timer("Env Step")
 
             # Create and add Experience
             experience = Experience(
@@ -183,16 +168,10 @@ class Worker:
         # Convert tensors to NumPy arrays before returning the episode
         episode.to_numpy()
 
-        # # Print profiling data
-        # print(f"\nWorker {self.worker_id} profiling data for this episode:")
-        # for func_name, data in profiling_data.items():
-        #     total_time = data["total_time"]
-        #     call_count = data["call_count"]
-        #     avg_time = total_time / call_count if call_count else 0
-        #     print(
-        #         f"{func_name}: Total Time = {total_time:.6f}s, Calls = {call_count}, Average Time = {avg_time:.6f}s"
-        #     )
-
+        elapsed_time = time.time() - start_time
+        print(
+            f"\nWorker {self.worker_id} finished episode in {elapsed_time:.2f} seconds"
+        )
         return episode
 
 
