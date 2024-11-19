@@ -86,7 +86,7 @@ def main():
 
     # Create and start worker processes
     worker_processes = []
-    for i in range(25):
+    for i in range(7):
         worker_process = multiprocessing.Process(
             target=worker_function, args=(i, parameter_manager, experience_queue)
         )
@@ -145,10 +145,10 @@ def main():
             print("Experience queue is empty. Waiting for episodes...")
             pass
 
-        if episode_count % 1000 == 0 and episode_count != 0:
+        if episode_count % 200 == 0 and episode_count != 0:
             current_time = time.time()
             elapsed = current_time - last_print_time
-            eps_per_sec = 1000 / elapsed if elapsed > 0 else float("inf")
+            eps_per_sec = 200 / elapsed if elapsed > 0 else float("inf")
             print(
                 f"***** Episode {episode_count} completed | {eps_per_sec:.2f} eps/sec ****"
             )

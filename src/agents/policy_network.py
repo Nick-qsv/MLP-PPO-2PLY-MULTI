@@ -64,6 +64,7 @@ class BackgammonPolicyNetwork(nn.Module):
             state_values (torch.Tensor): State value estimates for each action state.
                                          Shape: (batch_size,)
         """
-        x = torch.relu(self.fc1(x))
+        x = torch.sigmoid(self.fc1(x))
+        # x = torch.relu(self.fc1(x))
         state_values = self.value_head(x).squeeze(-1)
         return state_values

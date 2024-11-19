@@ -52,12 +52,12 @@ class Worker:
             episode = self.play_episode(env)
             episodes.append(episode)
 
-            # If we have collected 10 episodes, put them into the queue
-            if len(episodes) == 10:
+            # If we have collected 2 episodes, put them into the queue
+            if len(episodes) == 2:
                 self.experience_queue.put(episodes)
                 # Reset the episodes list
                 episodes = []
-                # At the end of 10 episodes, check for updated parameters
+                # At the end of 2 episodes, check for updated parameters
                 new_version = self.parameter_manager.get_version()
                 if new_version > self.current_version:
                     # Update local PolicyNetwork parameters
