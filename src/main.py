@@ -86,7 +86,7 @@ def main():
 
     # Create and start worker processes
     worker_processes = []
-    for i in range(7):
+    for i in range(31):
         worker_process = multiprocessing.Process(
             target=worker_function, args=(i, parameter_manager, experience_queue)
         )
