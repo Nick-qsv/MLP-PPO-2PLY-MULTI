@@ -51,6 +51,16 @@ class Trainer:
                 f"Expected {self.batch_episode_size} episodes, but got {len(episodes)}."
             )
 
+            # Profile GPU before update
+        gpu_util_before = pynvml.nvmlDeviceGetUtilizationRates(self.gpu_handle)
+        mem_info_before = pynvml.nvmlDeviceGetMemoryInfo(self.gpu_handle)
+
+        start_time = time.time()
+
+        # Initialize maximum GPU utilization tracker
+        max_gpu_util = gpu_util_before.gpu
+        max_mem_used = mem_info_before.used
+
         # Initialize win counts
         win_counts = {"regular": 0, "gammon": 0, "backgammon": 0}
 
@@ -137,6 +147,24 @@ class Trainer:
 
         # Update parameters in parameter manager
         self.parameter_manager.set_parameters(self.policy_network.state_dict())
+
+        end_time = time.time()
+
+        # Profile GPU after update
+        gpu_util_after = pynvml.nvmlDeviceGetUtilizationRates(self.gpu_handle)
+        mem_info_after = pynvml.nvmlDeviceGetMemoryInfo(self.gpu_handle)
+
+        # Print summary
+        print(f"Update completed in {end_time - start_time:.2f} seconds")
+        print("GPU Usage Summary:")
+        print(
+            f"  Before Update - Utilization: {gpu_util_before.gpu}%, Memory Used: {mem_info_before.used / (1024 ** 2):.2f} MB"
+        )
+        print(
+            f"  After Update  - Utilization: {gpu_util_after.gpu}%, Memory Used: {mem_info_after.used / (1024 ** 2):.2f} MB"
+        )
+        print(f"  Max Utilization during Update: {max_gpu_util}%")
+        print(f"  Max Memory Used during Update: {max_mem_used / (1024 ** 2):.2f} MB")
 
         # Log metrics using S3Logger
         global_step = self.total_episodes
