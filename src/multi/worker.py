@@ -57,18 +57,17 @@ class Worker:
                 self.experience_queue.put(episodes)
                 # Reset the episodes list
                 episodes = []
-
-            # At the end of the episode, check for updated parameters
-            new_version = self.parameter_manager.get_version()
-            if new_version > self.current_version:
-                # Update local PolicyNetwork parameters
-                state_dict = self.parameter_manager.get_parameters()
-                self.temperature = self.parameter_manager.get_temperature()
-                self.policy_network.load_state_dict(state_dict)
-                self.current_version = new_version
-                print(
-                    f"Worker {self.worker_id}: Updated parameters to version {self.current_version} with temperature {self.temperature}"
-                )
+                # At the end of 10 episodes, check for updated parameters
+                new_version = self.parameter_manager.get_version()
+                if new_version > self.current_version:
+                    # Update local PolicyNetwork parameters
+                    state_dict = self.parameter_manager.get_parameters()
+                    self.temperature = self.parameter_manager.get_temperature()
+                    self.policy_network.load_state_dict(state_dict)
+                    self.current_version = new_version
+                    print(
+                        f"Worker {self.worker_id}: Updated parameters to version {self.current_version} with temperature {self.temperature}"
+                    )
 
     def play_episode(self, env, max_steps=MAX_TIMESTEPS):
         """
@@ -85,9 +84,7 @@ class Worker:
             - Profiles the execution time of key operations and prints profiling data after the episode.
             - Handles cases with no legal moves by taking a no-op action.
         """
-        import time
-
-        start_time = time.time()
+        # start_time = time.time()
 
         episode = Episode()
         observation = env.reset()
@@ -168,10 +165,10 @@ class Worker:
         # Convert tensors to NumPy arrays before returning the episode
         episode.to_numpy()
 
-        elapsed_time = time.time() - start_time
-        print(
-            f"\nWorker {self.worker_id} finished episode in {elapsed_time:.2f} seconds"
-        )
+        # elapsed_time = time.time() - start_time
+        # print(
+        #     f"\nWorker {self.worker_id} finished episode in {elapsed_time:.2f} seconds"
+        # )
         return episode
 
 
