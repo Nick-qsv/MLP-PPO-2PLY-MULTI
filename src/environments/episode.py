@@ -49,9 +49,12 @@ class Experience:
 class Episode:
     def __init__(self):
         self.experiences = []  # List of Experience objects
+        self.win_type = None  # Initialize win_type
 
-    def add_experience(self, experience):
+    def add_experience(self, experience, info):
         self.experiences.append(experience)
+        if info.get("win_type"):
+            self.win_type = info["win_type"]
 
     def to_numpy(self):
         for experience in self.experiences:

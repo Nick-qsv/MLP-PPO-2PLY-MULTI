@@ -171,7 +171,7 @@ class Worker:
                 next_state_value=action_state_values[action_idx].item(),
             )
 
-            episode.add_experience(experience)
+            episode.add_experience(experience, info)
 
             # Move to next observation
             observation = next_observation
