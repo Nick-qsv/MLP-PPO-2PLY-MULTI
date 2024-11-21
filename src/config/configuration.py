@@ -1,5 +1,5 @@
 # Hyperparameters
-HIDDEN_SIZE = 80
+HIDDEN_SIZE = 60
 VALUE_LOSS_COEF = 0.5
 MAX_TIMESTEPS = 300
 NUM_EPISODES = 10_000_000
@@ -21,5 +21,5 @@ LR_DECAY_STEPS = 100_000  # Number of steps over which to decay learning rate
 
 # Temperature decay parameters
 INITIAL_TEMPERATURE = 1.5
-FINAL_TEMPERATURE = 0.7
+FINAL_TEMPERATURE = 0.5
 MAX_UPDATES = 3000

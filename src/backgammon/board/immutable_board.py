@@ -29,37 +29,37 @@ class ImmutableBoard:
         positions_0 = [0] * 24
         positions_1 = [0] * 24
 
-        # # Starting Board Player 1
-        # positions_0[Position.P_0] = 2
-        # positions_0[Position.P_11] = 5
-        # positions_0[Position.P_16] = 3
-        # positions_0[Position.P_18] = 5
-
-        # # Starting Board Player 2
-        # positions_1[Position.P_23] = 2
-        # positions_1[Position.P_12] = 5
-        # positions_1[Position.P_7] = 3
-        # positions_1[Position.P_5] = 5
-
-        # Starting Board P1 Prime/Closeout Tutor
+        # Starting Board Player 1
         positions_0[Position.P_0] = 2
-        positions_0[Position.P_11] = 4
-        positions_0[Position.P_13] = 1
-        positions_0[Position.P_14] = 1
-        positions_0[Position.P_15] = 1
-        positions_0[Position.P_17] = 2
-        positions_0[Position.P_18] = 2
-        positions_0[Position.P_19] = 2
+        positions_0[Position.P_11] = 5
+        positions_0[Position.P_16] = 3
+        positions_0[Position.P_18] = 5
 
-        # Starting Board P2 Prime/Closeout Tutor
+        # Starting Board Player 2
         positions_1[Position.P_23] = 2
-        positions_1[Position.P_12] = 4
-        positions_1[Position.P_10] = 1
-        positions_1[Position.P_9] = 1
-        positions_1[Position.P_8] = 1
-        positions_1[Position.P_6] = 2
-        positions_1[Position.P_5] = 2
-        positions_1[Position.P_4] = 2
+        positions_1[Position.P_12] = 5
+        positions_1[Position.P_7] = 3
+        positions_1[Position.P_5] = 5
+
+        # # Starting Board P1 Prime/Closeout Tutor
+        # positions_0[Position.P_0] = 2
+        # positions_0[Position.P_11] = 4
+        # positions_0[Position.P_13] = 1
+        # positions_0[Position.P_14] = 1
+        # positions_0[Position.P_15] = 1
+        # positions_0[Position.P_17] = 2
+        # positions_0[Position.P_18] = 2
+        # positions_0[Position.P_19] = 2
+
+        # # Starting Board P2 Prime/Closeout Tutor
+        # positions_1[Position.P_23] = 2
+        # positions_1[Position.P_12] = 4
+        # positions_1[Position.P_10] = 1
+        # positions_1[Position.P_9] = 1
+        # positions_1[Position.P_8] = 1
+        # positions_1[Position.P_6] = 2
+        # positions_1[Position.P_5] = 2
+        # positions_1[Position.P_4] = 2
 
         return ImmutableBoard(
             positions_0=tuple(positions_0),
