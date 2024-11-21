@@ -51,7 +51,7 @@ class Trainer:
                 f"Expected {self.batch_episode_size} episodes, but got {len(episodes)}."
             )
 
-            # Profile GPU before update
+        # Profile GPU before update
         gpu_util_before = pynvml.nvmlDeviceGetUtilizationRates(self.gpu_handle)
         mem_info_before = pynvml.nvmlDeviceGetMemoryInfo(self.gpu_handle)
 
@@ -61,8 +61,14 @@ class Trainer:
         max_gpu_util = gpu_util_before.gpu
         max_mem_used = mem_info_before.used
 
+        # Update the total episodes
+        self.total_episodes += len(episodes)
+
         # Initialize win counts
         win_counts = {"regular": 0, "gammon": 0, "backgammon": 0}
+        # Initialize counts for close_out_reward and prime_reward per player
+        close_out_counts = {}
+        prime_reward_counts = {}
 
         # Other accumulators for metrics
         total_loss = 0.0
@@ -82,6 +88,22 @@ class Trainer:
                 x_t = experience.observation
                 observations.append(x_t)
                 rewards.append(experience.reward)
+                # Collect reward counts
+                current_player = experience.info.get("current_player", None)
+                if current_player is not None:
+                    # Initialize count dictionaries if not already
+                    if current_player not in close_out_counts:
+                        close_out_counts[current_player] = 0
+                    if current_player not in prime_reward_counts:
+                        prime_reward_counts[current_player] = 0
+
+                    # Check for close_out_reward
+                    if experience.info.get("close_out_reward", False):
+                        close_out_counts[current_player] += 1
+
+                    # Check for prime_reward
+                    if experience.info.get("prime_reward", False):
+                        prime_reward_counts[current_player] += 1
 
             # Stack observations and rewards
             observations = torch.stack(observations)
@@ -183,9 +205,9 @@ class Trainer:
         self.logger.add_scalar(
             "Episode/Average Episode Length", average_episode_length, global_step
         )
-        self.logger.add_scalar("Wins/Regular", win_counts["regular"], global_step)
-        self.logger.add_scalar("Wins/Gammon", win_counts["gammon"], global_step)
-        self.logger.add_scalar("Wins/Backgammon", win_counts["backgammon"], global_step)
+
+        # Consolidated Wins Graph
+        self.logger.add_scalars("Wins", win_counts, global_step)
 
         # Log weight and bias histograms
         for name, param in self.policy_network.named_parameters():

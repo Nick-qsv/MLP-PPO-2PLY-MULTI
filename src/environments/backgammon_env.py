@@ -229,6 +229,7 @@ class BackgammonEnv(gym.Env):
             ):
                 reward += torch.tensor(REWARD_CLOSE_OUT, device=self.device)
                 self.close_out_reward_given[self.current_player] = True
+                info["close_out_reward"] = True
 
             # Check for making at least a 5-prime
             if (
@@ -237,6 +238,7 @@ class BackgammonEnv(gym.Env):
             ):
                 reward += torch.tensor(REWARD_MAKE_PRIME, device=self.device)
                 self.prime_reward_given[self.current_player] = True
+                info["prime_reward"] = True
 
             done = False
             self.pass_turn()
