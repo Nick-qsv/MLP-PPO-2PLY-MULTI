@@ -21,5 +21,5 @@ LR_DECAY_STEPS = 100_000  # Number of steps over which to decay learning rate
 
 # Temperature decay parameters
 INITIAL_TEMPERATURE = 1.5
-FINAL_TEMPERATURE = 0.6
+FINAL_TEMPERATURE = 0.7
 MAX_UPDATES = 3000

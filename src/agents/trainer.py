@@ -67,8 +67,8 @@ class Trainer:
         # Initialize win counts
         win_counts = {"regular": 0, "gammon": 0, "backgammon": 0}
         # Initialize counts for close_out_reward and prime_reward per player
-        close_out_counts = {}
-        prime_reward_counts = {}
+        total_close_out_counts = {}
+        total_prime_reward_counts = {}
 
         # Other accumulators for metrics
         total_loss = 0.0
@@ -89,22 +89,17 @@ class Trainer:
                 observations.append(x_t)
                 rewards.append(experience.reward)
                 # Collect reward counts
-                current_player = experience.info.get("current_player", None)
-                if current_player is not None:
-                    # Initialize count dictionaries if not already
-                    if current_player not in close_out_counts:
-                        close_out_counts[current_player] = 0
-                    if current_player not in prime_reward_counts:
-                        prime_reward_counts[current_player] = 0
+                # Update total counts for close_out_reward
+                for player_id, count in episode.close_out_counts.items():
+                    total_close_out_counts[player_id] = (
+                        total_close_out_counts.get(player_id, 0) + count
+                    )
 
-                    # Check for close_out_reward
-                    if experience.info.get("close_out_reward", False):
-                        close_out_counts[current_player] += 1
-
-                    # Check for prime_reward
-                    if experience.info.get("prime_reward", False):
-                        prime_reward_counts[current_player] += 1
-
+                # Update total counts for prime_reward
+                for player_id, count in episode.prime_reward_counts.items():
+                    total_prime_reward_counts[player_id] = (
+                        total_prime_reward_counts.get(player_id, 0) + count
+                    )
             # Stack observations and rewards
             observations = torch.stack(observations)
             rewards = torch.stack(rewards).squeeze()
@@ -205,6 +200,20 @@ class Trainer:
         self.logger.add_scalar(
             "Episode/Average Episode Length", average_episode_length, global_step
         )
+
+        for player_id in total_close_out_counts:
+            self.logger.add_scalar(
+                f"Rewards/CloseOutReward_Player{player_id}",
+                total_close_out_counts[player_id],
+                global_step,
+            )
+
+        for player_id in total_prime_reward_counts:
+            self.logger.add_scalar(
+                f"Rewards/PrimeReward_Player{player_id}",
+                total_prime_reward_counts[player_id],
+                global_step,
+            )
 
         # Consolidated Wins Graph
         self.logger.add_scalars("Wins", win_counts, global_step)

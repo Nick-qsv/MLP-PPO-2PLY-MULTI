@@ -50,11 +50,30 @@ class Episode:
     def __init__(self):
         self.experiences = []  # List of Experience objects
         self.win_type = None  # Initialize win_type
+        self.close_out_counts = {}  # Initialize close out counts per player
+        self.prime_reward_counts = {}  # Initialize prime reward counts per player
 
     def add_experience(self, experience, info):
         self.experiences.append(experience)
+
+        # Update win_type if present
         if info.get("win_type"):
             self.win_type = info["win_type"]
+
+        # Get current player
+        current_player = info.get("current_player", None)
+        if current_player is not None:
+            # Initialize counts if not present
+            if current_player not in self.close_out_counts:
+                self.close_out_counts[current_player] = 0
+            if current_player not in self.prime_reward_counts:
+                self.prime_reward_counts[current_player] = 0
+
+            # Increment counts based on info flags
+            if info.get("close_out_reward", False):
+                self.close_out_counts[current_player] += 1
+            if info.get("prime_reward", False):
+                self.prime_reward_counts[current_player] += 1
 
     def to_numpy(self):
         for experience in self.experiences:
