@@ -163,7 +163,7 @@ def main():
 
         # Check if it's time to save the model
         if episode_count % MODEL_SAVE_FREQUENCY == 0 and episode_count != 0:
-            filename = f"backgammon_60_standard_episode_{episode_count}.pth"
+            filename = f"backgammon_128_guided_episode_{episode_count}.pth"
             # Save model via ParameterManager
             parameter_manager.save_model(filename=filename, to_s3=True)
 
