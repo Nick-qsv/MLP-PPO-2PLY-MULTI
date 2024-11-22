@@ -32,18 +32,10 @@ class BackgammonEnv(gym.Env):
     def __init__(
         self,
         worker_id=None,
-        match_length=15,
         max_legal_moves=500,
         device=torch.device("cpu"),
     ):
         super(BackgammonEnv, self).__init__()
-
-        self.match_length = match_length
-        self.player_scores: Dict[int, int] = {
-            Player.PLAYER1: 0,
-            Player.PLAYER2: 0,
-        }
-        self.current_match_winner = None
 
         # Set the device
         self.device = device
@@ -51,7 +43,6 @@ class BackgammonEnv(gym.Env):
         self.board = ImmutableBoard.initial_board()
         self.current_player = Player.PLAYER1
         self.game_over = False
-        self.match_over = False
         self.current_board_features = self.board.get_board_features(self.current_player)
         self.max_legal_moves = max_legal_moves
 
@@ -99,21 +90,10 @@ class BackgammonEnv(gym.Env):
         }
 
     def reset(self):
-
-        if self.match_over:
-            self.player_scores = {Player.PLAYER1: 0, Player.PLAYER2: 0}
-            self.match_over = False
-            self.current_match_winner = None
-
         # Reset the board using setter method
         self.set_board(ImmutableBoard.initial_board())
         self.game_over = False
         self.win_type = None
-
-        # Alternate starting player using setter method
-        self.set_current_player(
-            Player.PLAYER1 if self.current_player == Player.PLAYER2 else Player.PLAYER2
-        )
 
         # Roll dice to determine who starts
         self.roll_dice()
@@ -191,35 +171,27 @@ class BackgammonEnv(gym.Env):
             win_type = "regular"  # Default win type
 
             if is_backgammon:
-                game_score = 3
                 reward = torch.tensor(REWARD_WIN_BACKGAMMON, device=self.device)
                 win_type = "backgammon"
             else:
                 is_gammon = check_for_gammon(self.board, self.current_player)
                 if is_gammon:
-                    game_score = 2
                     reward = torch.tensor(REWARD_WIN_GAMMON, device=self.device)
                     win_type = "gammon"
                 else:
-                    game_score = 1
                     reward = torch.tensor(REWARD_WIN_NORMAL, device=self.device)
 
             info.update(
                 {
                     "winner": self.current_player,
-                    "game_score": game_score,
                     "win_type": win_type,  # Include win type in info
                 }
             )
             self.win_type = win_type  # Set the win_type attribute
 
-            self.player_scores[self.current_player] += game_score
             self.game_over = True
             done = True
 
-            if self.player_scores[self.current_player] >= self.match_length:
-                self.current_match_winner = self.current_player
-                self.match_over = True
         else:
             # Game not over, check for close-out and prime
             # Check for close out
