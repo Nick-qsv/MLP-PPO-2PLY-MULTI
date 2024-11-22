@@ -145,7 +145,7 @@ def main():
             print("Experience queue is empty. Waiting for episodes...")
             pass
 
-        if episode_count % 200 == 0 and episode_count != 0:
+        if episode_count % 300 == 0 and episode_count != 0:
             current_time = time.time()
             elapsed = current_time - last_print_time
             eps_per_sec = 200 / elapsed if elapsed > 0 else float("inf")
@@ -154,16 +154,16 @@ def main():
             )
             last_print_time = current_time
 
-        # Test save to make sure S3 working
-        if episode_count == 100:
-            print(f"Saving model at episode {episode_count}")
-            filename = f"backgammon_test_episode_{episode_count}.pth"
-            # Save model via ParameterManager
-            parameter_manager.save_model(filename=filename, to_s3=True)
+        # # Test save to make sure S3 working
+        # if episode_count == 100:
+        #     print(f"Saving model at episode {episode_count}")
+        #     filename = f"backgammon_test_episode_{episode_count}.pth"
+        #     # Save model via ParameterManager
+        #     parameter_manager.save_model(filename=filename, to_s3=True)
 
         # Check if it's time to save the model
         if episode_count % MODEL_SAVE_FREQUENCY == 0 and episode_count != 0:
-            filename = f"backgammon_60n_HT_episode_{episode_count}.pth"
+            filename = f"backgammon_256_standard_episode_{episode_count}.pth"
             # Save model via ParameterManager
             parameter_manager.save_model(filename=filename, to_s3=True)
 
