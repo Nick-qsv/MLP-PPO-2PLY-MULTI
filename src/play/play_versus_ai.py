@@ -17,7 +17,9 @@ def play_game():
     done = False
     env = BackgammonEnv()
     policy_network = BackgammonPolicyNetwork()
-    path = os.path.join(project_root, "src/play", "backgammon_mlp_episode_760000.pth")
+    path = os.path.join(
+        project_root, "src/play", "backgammon_256_standard_episode_500000.pth"
+    )
     try:
         policy_network.load_state_dict(
             torch.load(path, map_location=torch.device("cpu"))
