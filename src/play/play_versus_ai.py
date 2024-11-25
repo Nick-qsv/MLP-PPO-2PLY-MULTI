@@ -18,7 +18,7 @@ def play_game():
     env = BackgammonEnv()
     policy_network = BackgammonPolicyNetwork()
     path = os.path.join(
-        project_root, "src/play", "backgammon_256_standard_episode_500000.pth"
+        project_root, "src/play", "backgammon_128_guided_episode_800000.pth"
     )
     try:
         policy_network.load_state_dict(
