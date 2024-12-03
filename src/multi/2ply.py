@@ -1,6 +1,10 @@
 from typing import List, Tuple
 import random
 import torch
+from src.environments import generate_all_board_features
+from src.backgammon.board.immutable_board import ImmutableBoard
+from src.backgammon.types import Player
+from src.backgammon import get_all_possible_moves
 
 # Precomputed dice rolls and probabilities
 DICE_ROLLS = [
@@ -37,88 +41,69 @@ PROBABILITIES = [count / TOTAL_OUTCOMES for count in COUNTS]
 # Assume `get_possible_moves` is a function that returns a list of possible moves for a dice roll
 
 
-def select_best_move(
-    initial_board_state,
-    current_player,
-    neural_network,
+def compute_scores_for_boards(
+    boards: list,  # List of 4 ImmutableBoard objects
+    state_values: list,  # List of 4 state values (S_m)
+    env,
     alpha=1.0,
     beta=0.5,
 ):
     """
-    Selects the best move based on an extended weighted evaluation model.
+    Computes scores for a list of boards and corresponding state values.
 
     Parameters:
-    - initial_board_state: The current board state (ImmutableBoard).
-    - current_player: The player making the move (Player).
-    - neural_network: An instance of BackgammonPolicyNetwork.
+    - boards: A list of exactly 4 ImmutableBoard objects.
+    - state_values: A list of exactly 4 state values (S_m), one for each board.
+    - env: The environment containing relevant evaluation tools.
     - alpha: Weight for the move's state value (default: 1.0).
     - beta: Weight for the opponent's expected response value (default: 0.5).
 
     Returns:
-    - best_move: The move with the highest score.
-    - best_score: The highest score achieved.
+    - scores: A list of computed scores for each board.
     """
 
-    # Get all possible moves for the current player and current board state
-    dice_roll = initial_board_state.current_dice_roll  # Assuming this is available
-    possible_moves = get_all_possible_moves(
-        current_player, initial_board_state, dice_roll
-    )
+    # Validate inputs
+    if len(boards) != 4:
+        raise ValueError("The 'boards' input must contain exactly 4 elements.")
+    if len(state_values) != 4:
+        raise ValueError("The 'state_values' input must contain exactly 4 elements.")
 
-    # If no possible moves, return None
-    if not possible_moves:
-        return None, None
+    scores = []
 
-    # Initialize variables to keep track of the best move and score
-    best_move = None
-    best_score = float("-inf")
-
-    # Iterate over each possible move
-    for move in possible_moves:
-        # Apply the move to get the new board state
-        new_board_state = execute_full_move_on_board_copy(initial_board_state, move)
-
-        # Evaluate the state value S_m of the move using the neural network
-        feature_vector = new_board_state.get_board_features(current_player)
-        S_m = neural_network.forward(feature_vector.unsqueeze(0)).item()
-
-        # Determine opponent's possible responses O_m
-        opponent = current_player.opponent()
+    # Loop through each board and corresponding state value
+    for board, S_m in zip(boards, state_values):
+        # Compute the weighted opponent response for the current board
         W_O_m = compute_weighted_opponent_response(
-            new_board_state,
-            opponent,
-            neural_network,
+            board, board.current_player.opponent(), env
         )
 
-        # Compute the score for the move
+        # Compute the score for the board
         score = alpha * S_m - beta * W_O_m
 
-        # Update the best move if this move has a higher score
-        if score > best_score:
-            best_score = score
-            best_move = move
+        # Add the computed score to the list
+        scores.append(score)
 
-    return best_move, best_score
+    return scores
 
 
 def compute_weighted_opponent_response(
-    board_state,
-    opponent_player,
-    neural_network,
+    board_state: ImmutableBoard,
+    opponent_player: Player,
+    env,
 ):
     """
-    Computes the weighted average of the opponent's responses.
+    Computes the weighted average of the opponent's responses,
+    considering only the top 5 moves per dice roll.
 
     Parameters:
     - board_state: The board state after the player's move.
     - opponent_player: The opponent player.
-    - neural_network: An instance of BackgammonPolicyNetwork.
+    - env: An environment object containing the policy network.
 
     Returns:
     - W_O_m: The weighted average of the opponent's possible responses.
     """
-    total_weighted_value = 0.0
-    total_probability = 0.0
+    total_weighted_average = 0.0
 
     # Iterate over all possible dice rolls and their probabilities
     for dice_roll, probability in zip(DICE_ROLLS, PROBABILITIES):
@@ -139,12 +124,21 @@ def compute_weighted_opponent_response(
             )
 
             # Evaluate state values of opponent's moves
-            state_values = neural_network.forward(board_tensors).squeeze()
+            state_values = env.policy_network.forward(board_tensors).squeeze()
 
-            # Accumulate weighted values
-            total_weighted_value += (state_values * probability).sum().item()
-            total_probability += probability * len(state_values)
+            # Sort state values in descending order
+            sorted_state_values, _ = torch.sort(state_values, descending=True)
 
-    # Compute the weighted average
-    W_O_m = total_weighted_value / total_probability if total_probability > 0 else 0.0
+            # Select the top 5 state values (or fewer)
+            top_state_values = sorted_state_values[:5]
+
+            # Compute the average of the top state values
+            average_top_value = top_state_values.mean().item()
+
+            # Multiply by the roll's probability and accumulate
+            weighted_average = average_top_value * probability
+            total_weighted_average += weighted_average
+
+    # The final weighted average
+    W_O_m = total_weighted_average
     return W_O_m
