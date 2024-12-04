@@ -86,7 +86,7 @@ def compute_scores_for_boards(
 
         # Add the computed score to the list
         scores.append(score)
-
+    print("2ply returned scores!")
     return scores
 
 
@@ -130,7 +130,7 @@ def compute_weighted_opponent_response(
 
             # Use the passed policy network to compute state values
             with torch.no_grad():
-                state_values = policy_network.forward(board_tensors).squeeze()
+                state_values = policy_network.forward(board_tensors).view(-1)
 
             # Sort state values in descending order
             sorted_state_values, _ = torch.sort(state_values, descending=True)

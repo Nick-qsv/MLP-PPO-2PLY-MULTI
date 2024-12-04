@@ -92,7 +92,7 @@ class Worker:
             - Profiles the execution time of key operations and prints profiling data after the episode.
             - Handles cases with no legal moves by taking a no-op action.
         """
-        # start_time = time.time()
+        start_time = time.time()
 
         episode = Episode()
         observation = env.reset()
@@ -166,9 +166,8 @@ class Worker:
                 )
                 # Convert state values to a probability distribution using softmax
                 temperature = self.temperature
-                action_probs = F.softmax(
-                    scores / temperature, dim=0
-                )  # Shape: (num_moves,)
+                scores_tensor = torch.tensor(scores)
+                action_probs = F.softmax(scores_tensor / temperature, dim=0)
 
                 # Create a categorical distribution based on action_probs
                 m = torch.distributions.Categorical(probs=action_probs)
@@ -209,10 +208,10 @@ class Worker:
         # Convert tensors to NumPy arrays before returning the episode
         episode.to_numpy()
 
-        # elapsed_time = time.time() - start_time
-        # print(
-        #     f"\nWorker {self.worker_id} finished episode in {elapsed_time:.2f} seconds"
-        # )
+        elapsed_time = time.time() - start_time
+        print(
+            f"\nWorker {self.worker_id} finished episode in {elapsed_time:.2f} seconds"
+        )
         return episode
 
 
