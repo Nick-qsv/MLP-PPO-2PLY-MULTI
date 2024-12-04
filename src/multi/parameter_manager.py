@@ -38,7 +38,16 @@ class ParameterManager:
         self.version = version
         self.parameters = parameters
 
-        # Remove s3_client from the constructor
+        # Initialize parameters if empty
+        with self.lock:
+            if not bool(self.parameters):  # Check if the parameters dictionary is empty
+                policy_network = BackgammonPolicyNetwork()
+                state_dict = policy_network.state_dict()
+                # Convert tensors to CPU to ensure compatibility
+                state_dict = {k: v.cpu() for k, v in state_dict.items()}
+                self.parameters.update(state_dict)
+                self.version.value = 1  # Set initial version
+
         self.s3_bucket_name = S3_BUCKET_NAME
         self.s3_model_prefix = S3_MODEL_PREFIX
 

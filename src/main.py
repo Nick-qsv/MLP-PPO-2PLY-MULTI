@@ -72,10 +72,10 @@ def main():
     # Initialize parameter manager with shared objects
     parameter_manager = ParameterManager(lock, version, parameters)
 
-    # Load the model from S3 here
-    parameter_manager.load_model(
-        filename="backgammon_256_standard_episode_3100000.pth", from_s3=True
-    )
+    # # Load the model from S3 here
+    # parameter_manager.load_model(
+    #     filename="backgammon_256_standard_episode_3100000.pth", from_s3=True
+    # )
 
     # Initialize ring replay buffer and experience queue
     replay_buffer = RingReplayBuffer(max_size=10000)
@@ -148,7 +148,7 @@ def main():
 
         # Check if it's time to save the model
         if episode_count % MODEL_SAVE_FREQUENCY == 0 and episode_count != 0:
-            filename = f"backgammon_256_from_3.1m_{episode_count}.pth"
+            filename = f"backgammon_256_sig_{episode_count}.pth"
             # Save model via ParameterManager
             parameter_manager.save_model(filename=filename, to_s3=True)
 
