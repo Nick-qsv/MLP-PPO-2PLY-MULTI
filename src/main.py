@@ -69,16 +69,13 @@ def main():
     version = manager.Value("i", 1)
     parameters = manager.dict()
 
-    # Initialize the policy network and get its state_dict
-    initial_network = BackgammonPolicyNetwork()
-    state_dict = initial_network.state_dict()
-
-    # Convert tensors to NumPy arrays for serialization
-    for key, tensor in state_dict.items():
-        parameters[key] = tensor.cpu().numpy()
-
     # Initialize parameter manager with shared objects
     parameter_manager = ParameterManager(lock, version, parameters)
+
+    # Load the model from S3 here
+    parameter_manager.load_model(
+        filename="backgammon_256_standard_episode_3100000.pth", from_s3=True
+    )
 
     # Initialize ring replay buffer and experience queue
     replay_buffer = RingReplayBuffer(max_size=10000)
@@ -154,16 +151,9 @@ def main():
             )
             last_print_time = current_time
 
-        # # Test save to make sure S3 working
-        # if episode_count == 100:
-        #     print(f"Saving model at episode {episode_count}")
-        #     filename = f"backgammon_test_episode_{episode_count}.pth"
-        #     # Save model via ParameterManager
-        #     parameter_manager.save_model(filename=filename, to_s3=True)
-
         # Check if it's time to save the model
         if episode_count % MODEL_SAVE_FREQUENCY == 0 and episode_count != 0:
-            filename = f"backgammon_40_guided_episode_{episode_count}.pth"
+            filename = f"backgammon_256_2ply_from_3.1m_{episode_count}.pth"
             # Save model via ParameterManager
             parameter_manager.save_model(filename=filename, to_s3=True)
 

@@ -7,7 +7,7 @@ from environments import (
     BackgammonEnv,
     execute_full_move_on_board_copy,
 )
-from two_ply import compute_scores_for_boards
+from multi.two_ply import compute_scores_for_boards
 from agents import BackgammonPolicyNetwork
 from config import MAX_TIMESTEPS
 import time
@@ -37,16 +37,18 @@ class Worker:
         self.parameter_manager = parameter_manager
         self.experience_queue = experience_queue
         self.device = torch.device("cpu")
-        self.temperature = 1.5
+        self.temperature = self.parameter_manager.get_temperature()
+
+        # Initialize the policy network and load parameters from ParameterManager
+        self.policy_network = BackgammonPolicyNetwork()
+        state_dict = self.parameter_manager.get_parameters()
+        self.policy_network.load_state_dict(state_dict)
+        self.current_version = self.parameter_manager.get_version()
 
     def run(self):
         """
         Main loop for the worker. Runs continuously, playing episodes and checking for parameter updates.
         """
-        self.policy_network = BackgammonPolicyNetwork()
-        state_dict = self.parameter_manager.get_parameters()
-        self.policy_network.load_state_dict(state_dict)
-        self.current_version = self.parameter_manager.get_version()
         # Create environment
         env = BackgammonEnv(worker_id=self.worker_id, device=self.device)
         print(f"Worker {self.worker_id} starting.")
@@ -155,7 +157,12 @@ class Worker:
                     resulting_boards.append(new_board)
 
                 scores = compute_scores_for_boards(
-                    resulting_boards, topk_values_list, env
+                    boards=resulting_boards,
+                    state_values=topk_values_list,
+                    player=env.current_player,
+                    policy_network=self.policy_network,
+                    alpha=1.0,
+                    beta=0.9,
                 )
                 # Convert state values to a probability distribution using softmax
                 temperature = self.temperature

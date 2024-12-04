@@ -44,7 +44,8 @@ PROBABILITIES = [count / TOTAL_OUTCOMES for count in COUNTS]
 def compute_scores_for_boards(
     boards: list,  # List of 4 ImmutableBoard objects
     state_values: list,  # List of 4 state values (S_m)
-    env,
+    player: Player,
+    policy_network,
     alpha=1.0,
     beta=0.9,
 ):
@@ -69,12 +70,15 @@ def compute_scores_for_boards(
         raise ValueError("The 'state_values' input must contain exactly 4 elements.")
 
     scores = []
+    opposite_player = Player.PLAYER1 if player == Player.PLAYER2 else Player.PLAYER2
 
     # Loop through each board and corresponding state value
     for board, S_m in zip(boards, state_values):
         # Compute the weighted opponent response for the current board
         W_O_m = compute_weighted_opponent_response(
-            board, board.current_player.opponent(), env
+            board_state=board,
+            opponent_player=opposite_player,
+            policy_network=policy_network,
         )
 
         # Compute the score for the board
@@ -89,7 +93,7 @@ def compute_scores_for_boards(
 def compute_weighted_opponent_response(
     board_state: ImmutableBoard,
     opponent_player: Player,
-    env,
+    policy_network,
 ):
     """
     Computes the weighted average of the opponent's responses,
@@ -98,7 +102,8 @@ def compute_weighted_opponent_response(
     Parameters:
     - board_state: The board state after the player's move.
     - opponent_player: The opponent player.
-    - env: An environment object containing the policy network.
+    - env: An environment object containing necessary tools.
+    - policy_network: The policy network to use for evaluating board states.
 
     Returns:
     - W_O_m: The weighted average of the opponent's possible responses.
@@ -123,8 +128,9 @@ def compute_weighted_opponent_response(
                 opponent_moves,
             )
 
-            # Evaluate state values of opponent's moves
-            state_values = env.policy_network.forward(board_tensors).squeeze()
+            # Use the passed policy network to compute state values
+            with torch.no_grad():
+                state_values = policy_network.forward(board_tensors).squeeze()
 
             # Sort state values in descending order
             sorted_state_values, _ = torch.sort(state_values, descending=True)
