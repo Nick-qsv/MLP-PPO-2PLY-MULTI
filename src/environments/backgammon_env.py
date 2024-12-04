@@ -141,7 +141,7 @@ class BackgammonEnv(gym.Env):
             done = False
             self.pass_turn()
             self.roll_dice()
-            self.profile_call(self.update_legal_moves)
+            self.update_legal_moves()
             observation = self.get_observation()
             return (
                 observation,

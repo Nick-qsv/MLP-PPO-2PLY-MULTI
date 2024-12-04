@@ -46,7 +46,7 @@ def compute_scores_for_boards(
     state_values: list,  # List of 4 state values (S_m)
     env,
     alpha=1.0,
-    beta=0.5,
+    beta=0.9,
 ):
     """
     Computes scores for a list of boards and corresponding state values.
