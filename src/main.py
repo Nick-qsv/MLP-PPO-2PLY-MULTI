@@ -112,22 +112,17 @@ def main():
     last_print_time = time.time()
 
     while episode_count < NUM_EPISODES:
-        # Try to get episodes from the ExperienceQueue
+        # Try to get an episode from the ExperienceQueue
         try:
-            episodes = experience_queue.get(
-                timeout=1
-            )  # Now expecting a list of episodes
-            for episode in episodes:
-                replay_buffer.add_episode(episode)
-                episode_count += 1
-                if episode_count % 100 == 0 and episode_count != 0:
-                    print(
-                        f"Episode count incremented to: {episode_count}"
-                    )  # Debug statement
+            episode = experience_queue.get(timeout=1)  # Now expecting a single episode
+            replay_buffer.add_episode(episode)
+            episode_count += 1
+            if episode_count % 100 == 0 and episode_count != 0:
+                print(f"Episode count incremented to: {episode_count}")
 
-            # Check if replay_buffer has reached x episodes
+            # Check if replay_buffer has reached the minimum number of episodes to train
             if len(replay_buffer.buffer) >= MIN_EPISODES_TO_TRAIN:
-                # Drain the buffer and push episodes to the Trainer
+                # Drain the buffer and prepare episodes for training
                 episodes_to_train = list(replay_buffer.buffer)
                 replay_buffer.buffer.clear()
                 # Convert episodes to tensors on the GPU
@@ -153,7 +148,7 @@ def main():
 
         # Check if it's time to save the model
         if episode_count % MODEL_SAVE_FREQUENCY == 0 and episode_count != 0:
-            filename = f"backgammon_256_2ply_from_3.1m_{episode_count}.pth"
+            filename = f"backgammon_256_from_3.1m_{episode_count}.pth"
             # Save model via ParameterManager
             parameter_manager.save_model(filename=filename, to_s3=True)
 

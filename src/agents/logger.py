@@ -46,9 +46,7 @@ class S3Logger:
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         if s3_bucket_name:
             # If S3 bucket is provided, set log_dir to S3 path
-            self.log_dir = (
-                f"s3://{s3_bucket_name}/{s3_log_prefix}{timestamp}_256_2ply_3m/"
-            )
+            self.log_dir = f"s3://{s3_bucket_name}/{s3_log_prefix}{timestamp}_256_3m/"
         elif log_dir is None:
             self.log_dir = os.path.join("runs", f"backgammon_ppo_{timestamp}")
         else:

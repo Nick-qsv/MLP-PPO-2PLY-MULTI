@@ -12,7 +12,6 @@ from agents import BackgammonPolicyNetwork
 from config import MAX_TIMESTEPS
 import time
 import torch.autograd.profiler as profiler
-import random
 
 
 class Worker:
@@ -53,19 +52,18 @@ class Worker:
         env = BackgammonEnv(worker_id=self.worker_id, device=self.device)
         print(f"Worker {self.worker_id} starting.")
 
-        episodes = []  # List to collect episodes
+        episode_count = 0  # Counter for episodes
 
         while True:
             # Play an episode
             episode = self.play_episode(env)
-            episodes.append(episode)
+            self.experience_queue.put(
+                episode
+            )  # Put each episode into the queue as it finishes
+            episode_count += 1
 
-            # If we have collected 2 episodes, put them into the queue
-            if len(episodes) == 2:
-                self.experience_queue.put(episodes)
-                # Reset the episodes list
-                episodes = []
-                # At the end of 2 episodes, check for updated parameters
+            # Check for updated parameters after every 2 episodes (or adjust as needed)
+            if episode_count % 2 == 0:
                 new_version = self.parameter_manager.get_version()
                 if new_version > self.current_version:
                     # Update local PolicyNetwork parameters
@@ -92,7 +90,7 @@ class Worker:
             - Profiles the execution time of key operations and prints profiling data after the episode.
             - Handles cases with no legal moves by taking a no-op action.
         """
-        start_time = time.time()
+        # start_time = time.time()
 
         episode = Episode()
         observation = env.reset()
@@ -133,55 +131,16 @@ class Worker:
             action_state_values = state_values[
                 1:
             ]  # State values for resulting states (num_moves,)
-            # Softmax-Based Action Selection
-            if len(action_state_values) >= 4:
-                # Find the indexes of the top 4 action_state_values
-                topk_values, topk_indices = torch.topk(action_state_values, k=4)
 
-                # Convert indices and values to lists for processing
-                topk_indices_list = topk_indices.tolist()
-                topk_values_list = topk_values.tolist()
+            # Convert state values to a probability distribution using softmax
+            temperature = self.temperature
+            action_probs = F.softmax(
+                action_state_values / temperature, dim=0
+            )  # Shape: (num_moves,)
 
-                # Use each index to get the FullMove object from env.legal_moves
-                selected_moves = [env.legal_moves[i] for i in topk_indices_list]
-
-                # Get the current board from env.board
-                current_board = env.board
-
-                # Initialize a list to store the resulting immutable boards
-                resulting_boards = []
-
-                # Loop through each FullMove to get the resulting immutable board
-                for move in selected_moves:
-                    new_board = execute_full_move_on_board_copy(current_board, move)
-                    resulting_boards.append(new_board)
-
-                scores = compute_scores_for_boards(
-                    boards=resulting_boards,
-                    state_values=topk_values_list,
-                    player=env.current_player,
-                    policy_network=self.policy_network,
-                    alpha=1.0,
-                    beta=0.9,
-                )
-                # Convert state values to a probability distribution using softmax
-                temperature = self.temperature
-                scores_tensor = torch.tensor(scores)
-                action_probs = F.softmax(scores_tensor / temperature, dim=0)
-
-                # Create a categorical distribution based on action_probs
-                m = torch.distributions.Categorical(probs=action_probs)
-                action_idx = m.sample().item()
-            else:
-                # Convert state values to a probability distribution using softmax
-                temperature = self.temperature
-                action_probs = F.softmax(
-                    action_state_values / temperature, dim=0
-                )  # Shape: (num_moves,)
-
-                # Create a categorical distribution based on action_probs
-                m = torch.distributions.Categorical(probs=action_probs)
-                action_idx = m.sample().item()
+            # Create a categorical distribution based on action_probs
+            m = torch.distributions.Categorical(probs=action_probs)
+            action_idx = m.sample().item()
 
             # Take action in env
             next_observation, reward, done, info = env.step(action_idx)
@@ -208,10 +167,10 @@ class Worker:
         # Convert tensors to NumPy arrays before returning the episode
         episode.to_numpy()
 
-        elapsed_time = time.time() - start_time
-        print(
-            f"\nWorker {self.worker_id} finished episode in {elapsed_time:.2f} seconds"
-        )
+        # elapsed_time = time.time() - start_time
+        # print(
+        #     f"\nWorker {self.worker_id} finished episode in {elapsed_time:.2f} seconds"
+        # )
         return episode
 
 
