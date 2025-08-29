@@ -1,11 +1,10 @@
 # MLP‑PPO‑2PLY‑MULTI
 
-An implementation of a sigmoid‑based neural network for Backgammon that uses Tesauro‑style board encoding. The model is a simple MLP that consumes a 198‑dimensional feature vector per board state (Tesauro’s representation) and outputs a scalar evaluation used within PPO training and two‑ply search utilities.
+An implementation of a sigmoid‑based neural network for Backgammon that uses Tesauro‑style board encoding. The model is a simple MLP that consumes a 198‑dimensional feature vector per board state (Tesauro’s representation) and outputs a scalar evaluation.
 
 ## What this is
 - Sigmoid MLP: First hidden layer uses `sigmoid` activation (see `src/agents/policy_network.py`).
 - Tesauro encoding: Board states are encoded into 198 features (see `src/backgammon/board/generate_board_tensor.py`).
-- PPO + multi/2‑ply tooling: Utilities for training and evaluating move choices using multiple workers and two‑ply lookahead.
 
 ## Tesauro‑Style 198‑Feature Encoding
 This project follows the classic TD‑Gammon/Neurogammon style features:
@@ -24,8 +23,3 @@ See implementation in `src/backgammon/board/generate_board_tensor.py` (function 
 
 ## Quick start
 - Install deps: `pip install -r requirements.txt`
-- Play vs AI: `python -m src.play.play_versus_ai`
-
-## Notes
-- Encoding and normalization closely follow Tesauro’s published representation so the network can learn from structured board features.
-
