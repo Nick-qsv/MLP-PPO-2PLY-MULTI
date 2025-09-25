@@ -4,15 +4,15 @@
 
 When I started this project, I had very little understanding of how "AI" works let alone how reinforcement learning works.  Subsequently, the first few passes I took at this "simple" idea of a neural network that plays backgammon led to a lot of misunderstandings.  
 
-When i started i did what any person in 2023 onwards _should_ do, I asked chatgpt how to do it.  It Suggested making it through Proximal Policy Optimzation (PPO), one of the most _advanced_ training methods.  Something Tesauro could have only dreamed of in 1996.  So I jumped in with both feet.
+When I started I did what any person in 2023 onwards _should_ do, I asked chatgpt how to do it.  Chatgpt suggested *Proximal Policy Optimzation (PPO)*, one of the most _advanced_ training methods.  Something Tesauro could have only dreamed of in 1996.  So I jumped in with both feet.
 
-Even if you ask chatgpt today (September 25, 2025) if you can create a backgammon rl net using ppo, it will tell you yes of course! nothing prevents it.  
+Even if you ask chatgpt today (September 25, 2025) if you can train a backgammon rl net using ppo, it will tell you yes of course! nothing prevents it.
 
 This is a hallucination.
 
 I'm sure any well trained RL researcher could quickly have realized the issue. The action space is too combinatorially large from board state to board state.  So if the board looks like X you have 7 moves, but if it looks Y then you have 1,000 distinct possible moves etc and they are all different.  So PPO works great for something like DOTA (discrete action space) and terribly for backgammon. Duh
 
-I learned this about a quarter of the way through the repo, threw in the towel, and went all in on TD Learning.  It's great for backgammon.  you just solve for the value function and ignore policy.  The result? A basic backgammon playing machine:
+I learned this about a quarter of the way through the repo, threw in the towel, and went all in on TD Learning.  It's great for backgammon.  you just train to optimize the value function.  The result? A basic backgammon playing machine:
 
 ## 
 
