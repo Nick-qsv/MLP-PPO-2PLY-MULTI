@@ -1,6 +1,6 @@
 # MLP‑PPO‑2PLY‑MULTI
 
-## Eplilogue
+## Introduction
 
 When I started this project, I had very little understanding of how "AI" works let alone how reinforcement learning works.  Subsequently, the first few passes I took at this "simple" idea of a neural network that plays backgammon led to a lot of misunderstandings.  
 
