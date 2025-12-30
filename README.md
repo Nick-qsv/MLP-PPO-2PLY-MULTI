@@ -1,4 +1,4 @@
-# MLP‑PPO‑2PLY‑MULTI
+# MLP-Backgammon-NN
 
 ## Introduction
 
