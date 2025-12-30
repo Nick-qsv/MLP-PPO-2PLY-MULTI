@@ -2,17 +2,17 @@
 
 ## Introduction
 
-When I started this project, I had very little understanding of how "AI" works let alone how reinforcement learning works.  Subsequently, the first few passes I took at this "simple" idea of a neural network that plays backgammon led to a lot of misunderstandings.  
+When I started this project, I had very little understanding of how Neural Networks or reinforcement learning.  Subsequently, the first few passes I took at this "simple" idea of a neural network that plays backgammon led to a lot of misunderstandings.  
 
-When I started I did what any person in 2023 onwards _should_ do, I asked chatgpt how to do it.  Chatgpt suggested *Proximal Policy Optimzation (PPO)*, one of the most _advanced_ training methods.  Something Tesauro could have only dreamed of in 1996.  So I jumped in with both feet.
+When I started I did what any person in 2023 onwards _should_ do, I asked chatGPT how to start.  ChatGPT suggested *Proximal Policy Optimzation (PPO)*, one of the most _advanced_ training methods.  Something Tesauro, the person whose work this project is based on, could have only dreamed of using in 1996 to train his backgammon neural net.
 
-Even if you ask chatgpt today (September 25, 2025) if you can train a backgammon rl net using ppo, it will tell you yes of course! nothing prevents it.
+Even if you ask chatgpt today (September 25, 2025) if you can train a backgammon neural net using PPO, it will tell you yes of course! nothing prevents it.
 
 This is a hallucination.
 
-I'm sure any well trained RL researcher could quickly have realized the issue. The action space is too combinatorially large from board state to board state.  So if the board looks like X you have 7 moves, but if it looks Y then you have 1,000 distinct possible moves etc and they are all different.  So PPO works great for something like DOTA (discrete action space) and terribly for backgammon. Duh
+I'm sure any RL researcher could quickly have realized the issue. The action space is too combinatorially large from board state to board state.  So if the board looks like X you have 7 moves, but if it looks Y then you have 240 moves etc and they are all different.  So PPO works great for something like DOTA (discrete action space) and terribly for backgammon.
 
-I learned this about a quarter of the way through the repo, threw in the towel, and went all in on TD Learning.  It's great for backgammon.  you just train to optimize the value function.  The result? A basic backgammon playing machine:
+I learned this about a quarter of the way through the repo, threw in the towel, and went all in on TD Learning.  It's great for backgammon.  You just train to optimize the value function.  The result is a basic backgammon playing neural network that evaluates the best move by looking at every possible board configuration after the move is played, and evaluating which board is best for the computer going forward.
 
 ## 
 
